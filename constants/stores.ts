@@ -1,0 +1,51 @@
+// Dummy store data for Dakar, Senegal
+export const stores = [
+  {
+    id: '1',
+    name: 'Restaurant Teranga',
+    type: 'restaurant' as const,
+    latitude: 14.6937,
+    longitude: -17.4441,
+    address: 'Avenue Léopold Sédar Senghor, Plateau, Dakar',
+  },
+  {
+    id: '2',
+    name: 'Pharmacie du Centenaire',
+    type: 'pharmacy' as const,
+    latitude: 14.6928,
+    longitude: -17.4467,
+    address: 'Avenue Pompidou, Plateau, Dakar',
+  },
+  {
+    id: '3',
+    name: 'Auchan Dakar',
+    type: 'grocery' as const,
+    latitude: 14.7167,
+    longitude: -17.4677,
+    address: 'Route des Almadies, Almadies, Dakar',
+  },
+  {
+    id: '4',
+    name: 'Chez Loutcha',
+    type: 'restaurant' as const,
+    latitude: 14.6892,
+    longitude: -17.4409,
+    address: 'Rue 6, Médina, Dakar',
+  },
+  {
+    id: '5',
+    name: 'Pharmacie Gueule Tapée',
+    type: 'pharmacy' as const,
+    latitude: 14.6845,
+    longitude: -17.4532,
+    address: 'Avenue Blaise Diagne, Gueule Tapée, Dakar',
+  },
+  {
+    id: '6',
+    name: 'Casino Supermarché',
+    type: 'grocery' as const,
+    latitude: 14.7045,
+    longitude: -17.4692,
+    address: 'Rue de Mermoz, Mermoz, Dakar',
+  },
+];
