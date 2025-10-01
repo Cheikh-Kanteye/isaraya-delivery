@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,27 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Package,
-  Clock,
   MapPin,
   Star,
   Phone,
   MessageCircle,
-  CheckCircle,
+  RefreshCw,
 } from 'lucide-react-native';
 import { Theme, createCardStyle, createTextStyle } from '@/constants/theme';
-// No direct use of useAuth or authService in this file, but keeping the import style consistent
-// import { useAuth } from '@/contexts/AuthContext';
-// import { authService } from '@/services/authService';
+import { deliveryService } from '@/services/deliveryService';
+import { DeliveryRequest } from '@/types/client';
 
 export default function ClientOrdersScreen() {
+  const [orders, setOrders] = useState<DeliveryRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const formatCurrency = (amount: number) => {
     return (
       new Intl.NumberFormat('fr-FR', {
@@ -33,50 +37,64 @@ export default function ClientOrdersScreen() {
     );
   };
 
-  const mockOrders = [
-    {
-      id: '1',
-      status: 'in_progress',
-      driverName: 'Marc Dubois',
-      driverImage:
-        'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150',
-      driverRating: 4.9,
-      pickupAddress: '15 Avenue Cheikh Anta Diop, Dakar',
-      deliveryAddress: '8 Rue de la Paix, Plateau, Dakar',
-      estimatedTime: '15 min',
-      amount: 8500,
-      tip: 1000,
-      createdAt: 'Il y a 10 minutes',
-    },
-    {
-      id: '2',
-      status: 'delivered',
-      driverName: 'Fatou Diop',
-      driverImage:
-        'https://images.pexels.com/photos/3763188/pexels-photo-3763188.jpeg?auto=compress&cs=tinysrgb&w=150',
-      driverRating: 4.8,
-      pickupAddress: 'Marché Sandaga, Dakar',
-      deliveryAddress: '15 Avenue Cheikh Anta Diop, Dakar',
-      estimatedTime: 'Livré',
-      amount: 6500,
-      tip: 500,
-      createdAt: 'Il y a 2 jours',
-    },
-    {
-      id: '3',
-      status: 'delivered',
-      driverName: 'Ibrahima Fall',
-      driverImage:
-        'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150',
-      driverRating: 4.7,
-      pickupAddress: 'Restaurant Teranga, Plateau',
-      deliveryAddress: '15 Avenue Cheikh Anta Diop, Dakar',
-      estimatedTime: 'Livré',
-      amount: 12000,
-      tip: 2000,
-      createdAt: 'Il y a 1 semaine',
-    },
-  ];
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInMs = now.getTime() - date.getTime();
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
+
+      if (diffInMinutes < 60) {
+        return `Il y a ${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''}`;
+      } else if (diffInHours < 24) {
+        return `Il y a ${diffInHours} heure${diffInHours > 1 ? 's' : ''}`;
+      } else {
+        return `Il y a ${diffInDays} jour${diffInDays > 1 ? 's' : ''}`;
+      }
+    } catch {
+      return 'Date inconnue';
+    }
+  };
+
+  const fetchOrders = async (showRefreshing = false) => {
+    try {
+      if (showRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      // Use the correct endpoint and DTO from API_ENDPOINTS.md
+      const clientMissions = await deliveryService.getClientMissions();
+      console.log('Fetched clientMissions:', clientMissions);
+      // Defensive check to ensure clientMissions is an array
+      if (Array.isArray(clientMissions)) {
+        setOrders(clientMissions);
+      } else {
+        console.warn('clientMissions is not an array:', clientMissions);
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des commandes:', error);
+      Alert.alert(
+        'Erreur',
+        'Impossible de charger vos commandes. Veuillez réessayer.'
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const handleRefresh = () => {
+    fetchOrders(true);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -100,17 +118,43 @@ export default function ClientOrdersScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Mes Commandes</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Theme.colors.primary[500]} />
+          <Text style={styles.loadingText}>Chargement de vos commandes...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mes Commandes</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Mes Commandes</Text>
+          <TouchableOpacity onPress={handleRefresh} disabled={refreshing}>
+            <RefreshCw
+              size={Theme.layout.iconSize.md}
+              color={
+                refreshing
+                  ? Theme.colors.neutral[400]
+                  : Theme.colors.primary[500]
+              }
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {mockOrders.map((order) => (
+        {orders.map((order) => (
           <View key={order.id} style={styles.orderCard}>
             {/* Order Header */}
             <View style={styles.orderHeader}>
@@ -131,49 +175,55 @@ export default function ClientOrdersScreen() {
                       {getStatusText(order.status)}
                     </Text>
                   </View>
-                  <Text style={styles.orderTime}>{order.createdAt}</Text>
+                  <Text style={styles.orderTime}>
+                    {formatDate(order.createdAt)}
+                  </Text>
                 </View>
               </View>
             </View>
 
-            {/* Driver Info */}
-            <View style={styles.driverSection}>
-              <Image
-                source={{ uri: order.driverImage }}
-                style={styles.driverImage}
-              />
-              <View style={styles.driverInfo}>
-                <Text style={styles.driverName}>{order.driverName}</Text>
-                <View style={styles.driverRating}>
-                  <Star
-                    size={Theme.layout.iconSize.xs}
-                    color={Theme.colors.accent[500]}
-                  />
-                  <Text style={styles.ratingText}>{order.driverRating}</Text>
+            {/* Driver Info - Only show if assigned */}
+            {order.livreurId && (
+              <View style={styles.driverSection}>
+                <Image
+                  source={{
+                    uri: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150',
+                  }}
+                  style={styles.driverImage}
+                />
+                <View style={styles.driverInfo}>
+                  <Text style={styles.driverName}>Livreur assigné</Text>
+                  <View style={styles.driverRating}>
+                    <Star
+                      size={Theme.layout.iconSize.xs}
+                      color={Theme.colors.accent[500]}
+                    />
+                    <Text style={styles.ratingText}>4.5</Text>
+                  </View>
+                  {order.status === 'in_progress' && (
+                    <Text style={styles.estimatedTime}>
+                      Temps estimé: {order.estimatedDuration || '15 min'}
+                    </Text>
+                  )}
                 </View>
                 {order.status === 'in_progress' && (
-                  <Text style={styles.estimatedTime}>
-                    Arrivée: {order.estimatedTime}
-                  </Text>
+                  <View style={styles.contactButtons}>
+                    <TouchableOpacity style={styles.contactButton}>
+                      <Phone
+                        size={Theme.layout.iconSize.xs}
+                        color={Theme.colors.secondary[500]}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.contactButton}>
+                      <MessageCircle
+                        size={Theme.layout.iconSize.xs}
+                        color={Theme.colors.secondary[500]}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
-              {order.status === 'in_progress' && (
-                <View style={styles.contactButtons}>
-                  <TouchableOpacity style={styles.contactButton}>
-                    <Phone
-                      size={Theme.layout.iconSize.xs}
-                      color={Theme.colors.secondary[500]}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.contactButton}>
-                    <MessageCircle
-                      size={Theme.layout.iconSize.xs}
-                      color={Theme.colors.secondary[500]}
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+            )}
 
             {/* Addresses */}
             <View style={styles.addressesSection}>
@@ -202,7 +252,7 @@ export default function ClientOrdersScreen() {
                 <View style={styles.addressInfo}>
                   <Text style={styles.addressLabel}>Livraison</Text>
                   <Text style={styles.addressText}>
-                    {order.deliveryAddress}
+                    {order.destinationAddress}
                   </Text>
                 </View>
               </View>
@@ -213,21 +263,13 @@ export default function ClientOrdersScreen() {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Montant de la livraison</Text>
                 <Text style={styles.summaryValue}>
-                  {formatCurrency(order.amount)}
+                  {formatCurrency(order.deliveryFee || 0)}
                 </Text>
               </View>
-              {order.tip > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Pourboire</Text>
-                  <Text style={styles.summaryValue}>
-                    {formatCurrency(order.tip)}
-                  </Text>
-                </View>
-              )}
               <View style={[styles.summaryRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total payé</Text>
+                <Text style={styles.totalLabel}>Total</Text>
                 <Text style={styles.totalValue}>
-                  {formatCurrency(order.amount + order.tip)}
+                  {formatCurrency(order.deliveryFee || 0)}
                 </Text>
               </View>
             </View>
@@ -260,7 +302,7 @@ export default function ClientOrdersScreen() {
           </View>
         ))}
 
-        {mockOrders.length === 0 && (
+        {orders.length === 0 && !loading && (
           <View style={styles.emptyState}>
             <Package size={48} color={Theme.colors.neutral[300]} />
             <Text style={styles.emptyStateTitle}>Aucune commande</Text>
@@ -288,6 +330,20 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...createTextStyle('2xl', 'bold', Theme.colors.neutral[900]),
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...createTextStyle('base', 'normal', Theme.colors.neutral[500]),
+    marginTop: Theme.spacing.md,
   },
   scrollView: {
     flex: 1,
@@ -473,5 +529,3 @@ const styles = StyleSheet.create({
     paddingHorizontal: Theme.spacing['3xl'],
   },
 });
-
-

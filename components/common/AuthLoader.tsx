@@ -6,15 +6,12 @@ interface AuthLoaderProps {
   message?: string;
 }
 
-export default function AuthLoader({ 
-  message = "Chargement de votre profil..." 
+export default function AuthLoader({
+  message = 'Chargement de votre profil...',
 }: AuthLoaderProps) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator 
-        size="large" 
-        color={Theme.colors.primary[500]} 
-      />
+      <ActivityIndicator size="large" color={Theme.colors.primary[500]} />
       <Text style={styles.message}>{message}</Text>
     </View>
   );
@@ -29,8 +26,8 @@ const styles = StyleSheet.create({
     padding: Theme.spacing.xl,
   },
   message: {
-    ...createTextStyle('md', 'medium', Theme.colors.neutral[700]),
+    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
     marginTop: Theme.spacing.md,
     textAlign: 'center',
-  }
+  },
 });

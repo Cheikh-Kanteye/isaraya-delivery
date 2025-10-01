@@ -38,7 +38,7 @@ export default function RegisterForm({
     name: '',
     phoneNumber: '',
     address: '',
-    vehicle: 'Scooter',
+    vehicle: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -63,7 +63,7 @@ export default function RegisterForm({
       errors.phoneNumber = 'Le téléphone est requis';
     }
 
-    if (!formData.address.trim()) {
+    if (!formData.address?.trim()) {
       errors.address = "L'adresse est requise";
     }
 
@@ -98,7 +98,8 @@ export default function RegisterForm({
   };
 
   const handleInputChange = (field: keyof BaseRegisterData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const trimmedValue = value.trimStart();
+    setFormData((prev) => ({ ...prev, [field]: trimmedValue }));
 
     // Clear field error when user starts typing
     if (fieldErrors[field]) {

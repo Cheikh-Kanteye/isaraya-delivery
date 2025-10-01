@@ -230,7 +230,7 @@ export const DeliveryDetails: React.FC<DeliveryDetailsProps> = ({
 const styles = StyleSheet.create({
   content: {
     padding: 20,
-    paddingBottom: 100, // Pour éviter que le footer ne cache le contenu
+    paddingBottom: 120, // More space to avoid footer overlap and keyboard
   },
   card: {
     backgroundColor: Theme.colors.white,

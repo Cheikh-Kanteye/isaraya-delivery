@@ -15,6 +15,7 @@ export interface DeliveryRequest {
   createdAt: string;
   estimatedDuration: number; // in minutes, calculated by backend
   distance: number; // in km, calculated by backend
+  livreurId?: string;
 }
 
 export interface Driver {

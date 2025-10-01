@@ -22,7 +22,8 @@ interface ForgotPasswordFormProps {
 export default function ForgotPasswordForm({
   onBack,
 }: ForgotPasswordFormProps) {
-  const { resetPassword, isLoading, error, clearError } = useAuth<BaseUser>();
+  const { requestPasswordReset, isLoading, error, clearError } =
+    useAuth<BaseUser>();
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState('');
@@ -50,7 +51,7 @@ export default function ForgotPasswordForm({
     }
 
     try {
-      await resetPassword(email);
+      await requestPasswordReset({ email });
       setEmailSent(true);
     } catch (error) {
       // Error is handled by the context
@@ -58,7 +59,8 @@ export default function ForgotPasswordForm({
   };
 
   const handleEmailChange = (value: string) => {
-    setEmail(value);
+    const trimmedValue = value.trimStart();
+    setEmail(trimmedValue);
     if (emailError) {
       setEmailError('');
     }
@@ -247,5 +249,3 @@ const styles = StyleSheet.create({
     ...createTextStyle('base', 'semibold', Theme.colors.white),
   },
 });
-
-

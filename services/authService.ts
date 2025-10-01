@@ -69,12 +69,12 @@ export class AuthService<T extends BaseUser> {
       });
       console.log('Response from backend:', response);
 
-      // Handle backend response structure
-      if (!response.success) {
+      // Handle backend response structure with payload
+      if (!response.payload?.success) {
         throw new Error(response.message || 'Login failed');
       }
 
-      const { user, accessToken } = response;
+      const { user, accessToken } = response.payload;
 
       if (!user || !accessToken) {
         console.warn('Invalid response from server. Missing user or token.');
@@ -169,7 +169,7 @@ export class AuthService<T extends BaseUser> {
       console.log('Registration response:', response);
 
       // Backend returns success without access token (email verification required)
-      if (response.success && response.statusCode === 201) {
+      if (response.payload?.success && response.payload.statusCode === 201) {
         return {
           success: true,
           message: response.message,
@@ -242,9 +242,9 @@ export class AuthService<T extends BaseUser> {
       });
 
       return {
-        success: response.success || true,
+        success: response.payload?.success || true,
         message: response.message || 'Email vérifié avec succès',
-        email: response.email,
+        email: response.payload?.email || response.email,
       };
     } catch (error) {
       console.error('Email verification failed:', error);
@@ -265,7 +265,7 @@ export class AuthService<T extends BaseUser> {
       });
 
       // Correction: adapter selon la structure de réponse du backend
-      const user = response.user || response;
+      const user = response.payload?.user || response.user || response;
       this.currentUser = user;
 
       console.log(response);
@@ -310,7 +310,7 @@ export class AuthService<T extends BaseUser> {
       });
 
       // Correction: adapter selon la structure de réponse du backend
-      const user = response.user || response;
+      const user = response.payload?.user || response.user || response;
       this.currentUser = user;
 
       // Update user in AsyncStorage

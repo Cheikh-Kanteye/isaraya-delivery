@@ -55,6 +55,13 @@ export const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100, // Space for footer
+  },
   content: {
     padding: 20,
   },

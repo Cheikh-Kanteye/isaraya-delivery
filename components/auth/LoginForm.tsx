@@ -103,22 +103,6 @@ export default function LoginForm({
     }
   };
 
-  // Demo credentials helper
-  const fillDemoCredentials = () => {
-    if (userType === 'CLIENT') {
-      setCredentials({
-        email: 'cheikhkanteye.contact@gmail.com',
-        password: 'password123',
-      });
-    } else {
-      setCredentials({
-        email: 'amy@example.com',
-        password: 'password123',
-      });
-    }
-    setFieldErrors({});
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -128,13 +112,6 @@ export default function LoginForm({
           {userType === 'CLIENT' ? 'client' : 'livreur'}
         </Text>
       </View>
-
-      {/* Demo Helper */}
-      <TouchableOpacity style={styles.demoButton} onPress={fillDemoCredentials}>
-        <Text style={styles.demoButtonText}>
-          📱 Utiliser les identifiants de démo
-        </Text>
-      </TouchableOpacity>
 
       {/* Global Error */}
       {error && (

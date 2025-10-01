@@ -1,11 +1,18 @@
 import 'react-native-get-random-values';
 import { useState, useEffect } from 'react';
-import { StatusBar, FlatList, Alert, Linking } from 'react-native';
+import {
+  StatusBar,
+  ScrollView,
+  Alert,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Theme } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { Client } from '@/types/auth';
-import { Header } from '@/components/client/Header';
+import Header from '@/components/client/Header';
 import { DeliveryDetails } from '@/components/client/DeliveryDetails';
 import { PaymentConfirmation } from '@/components/client/PaymentConfirmation';
 import { Footer } from '@/components/client/Footer';
@@ -170,16 +177,20 @@ export default function CreateOrderScreen() {
         backgroundColor={Theme.colors.primary[600]}
       />
       <Header step={step} onBack={handleBack} />
-      <FlatList
-        data={[0]}
-        renderItem={() => renderContent()}
-        keyExtractor={() => 'content'}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled={true}
-        style={styles.scrollView}
-        // contentContainerStyle={styles.scrollContent}
-      />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderContent()}
+        </ScrollView>
+      </KeyboardAvoidingView>
       <Footer
         step={step}
         isLoading={isLoading}
