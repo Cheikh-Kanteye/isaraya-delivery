@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { orders as ConstantOrders } from '@/constants/orders';
 import OrderCard from '@/components/orders/OrderCard';
 import { Theme, createTextStyle } from '@/constants/theme';
-import { Order } from '@/types/orders';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { X } from 'lucide-react-native';
+import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
+import { useAuth } from '@/contexts/AuthContext';
+import { Deliver } from '@/types/auth';
+import { DeliveryRequest } from '@/types/client';
 
 // HTML content for the Leaflet map with Routing Machine
 const mapHtml = `
@@ -109,23 +111,24 @@ const mapHtml = `
 `;
 
 const Map: React.FC = () => {
+  const { entity: deliver } = useAuth<Deliver>();
   const webViewRef = useRef<WebView>(null);
-  const [orders, setOrders] = useState<Order[]>(ConstantOrders);
   const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(
     null
   );
   const { location, isLoading, error, startTracking, stopTracking } =
     useUserLocation();
 
-  // Send map center, markers, and user location to WebView when not navigating
+  const { activeOrders, acceptOrder, declineOrder } = useDeliveryOrders();
+
   useEffect(() => {
     if (!location || !webViewRef.current || navigatingOrderId) return;
 
-    const markers = orders.map((order) => ({
-      lat: order.lat,
-      lng: order.lng,
-      name: order.restaurant,
-      address: order.address,
+    const markers = activeOrders.map((order) => ({
+      lat: order.pickupLatitude,
+      lng: order.pickupLongitude,
+      name: 'Point de collecte',
+      address: order.pickupAddress,
     }));
 
     const timer = setTimeout(() => {
@@ -141,13 +144,12 @@ const Map: React.FC = () => {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [location, orders, navigatingOrderId]);
+  }, [location, activeOrders, navigatingOrderId]);
 
-  // Update route and user location during navigation
   useEffect(() => {
     if (!location || !webViewRef.current || !navigatingOrderId) return;
 
-    const order = orders.find((o) => o.id === navigatingOrderId);
+    const order = activeOrders.find((o) => o.id === navigatingOrderId);
     if (!order) return;
 
     webViewRef.current.injectJavaScript(`
@@ -155,28 +157,27 @@ const Map: React.FC = () => {
         userLocation: ${JSON.stringify(location)},
         route: {
           start: ${JSON.stringify(location)},
-          end: { lat: ${order.lat}, lng: ${order.lng} }
+          end: { lat: ${order.pickupLatitude}, lng: ${order.pickupLongitude} }
         }
       }), '*');
     `);
-  }, [location, navigatingOrderId, orders]);
+  }, [location, navigatingOrderId, activeOrders]);
 
-  const handleAccept = (orderId: string): void => {
-    console.log(`Accepted delivery: ${orderId}`);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: 'accepted' } : order
-      )
-    );
+  const handleAccept = async (orderId: string): Promise<void> => {
+    if (!deliver?.id) return;
+    try {
+      await acceptOrder(orderId, deliver.id);
+    } catch (error) {
+      console.error('Failed to accept order:', error);
+    }
   };
 
-  const handleDecline = (orderId: string): void => {
-    console.log(`Declined delivery: ${orderId}`);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: 'rejected' } : order
-      )
-    );
+  const handleDecline = async (orderId: string): Promise<void> => {
+    try {
+      await declineOrder(orderId);
+    } catch (error) {
+      console.error('Failed to decline order:', error);
+    }
   };
 
   const handleCall = (orderId: string): void => {
@@ -188,10 +189,9 @@ const Map: React.FC = () => {
   };
 
   const handleNavigate = (orderId: string): void => {
-    console.log(`Navigate to: ${orderId}`);
     if (!location || !webViewRef.current) return;
 
-    const order = orders.find((o) => o.id === orderId);
+    const order = activeOrders.find((o) => o.id === orderId);
     if (!order) return;
 
     setNavigatingOrderId(orderId);
@@ -201,14 +201,13 @@ const Map: React.FC = () => {
       window.postMessage(JSON.stringify({
         route: {
           start: ${JSON.stringify(location)},
-          end: { lat: ${order.lat}, lng: ${order.lng} }
+          end: { lat: ${order.pickupLatitude}, lng: ${order.pickupLongitude} }
         }
       }), '*');
     `);
   };
 
   const handleStopNavigation = (): void => {
-    console.log('Stopped navigation');
     setNavigatingOrderId(null);
     stopTracking();
     if (webViewRef.current) {
@@ -218,7 +217,7 @@ const Map: React.FC = () => {
     }
   };
 
-  const renderTaskCard = ({ item }: { item: Order }) => (
+  const renderTaskCard = ({ item }: { item: DeliveryRequest }) => (
     <OrderCard
       order={item}
       onAccept={handleAccept}
@@ -269,11 +268,11 @@ const Map: React.FC = () => {
       {/* Scrollable Cards Section (hidden during navigation) */}
       {!navigatingOrderId && (
         <View style={styles.cardsContainer}>
-          <Text style={styles.sectionTitle}>Delivery Tasks</Text>
+          <Text style={styles.sectionTitle}>Commandes en Cours</Text>
           <FlatList
-            data={orders}
+            data={activeOrders}
             renderItem={renderTaskCard}
-            keyExtractor={(item: Order) => item.id}
+            keyExtractor={(item: DeliveryRequest) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.flatListContent}

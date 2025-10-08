@@ -49,19 +49,11 @@ export default function HomeScreen() {
     setIsOnline(newStatus);
 
     try {
-      console.log(deliver);
-
-      Reflect.deleteProperty(deliver!, 'createdAt');
-      Reflect.deleteProperty(deliver!, 'updatedAt');
-
       await updateProfile({
-        ...deliver,
         isOnline: newStatus,
       });
     } catch (error) {
-      // Revert on error
       console.log(error);
-
       setIsOnline(!newStatus);
     }
   };

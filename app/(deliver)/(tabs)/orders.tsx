@@ -5,46 +5,63 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Filter, Package } from 'lucide-react-native';
 import { Theme, createTextStyle } from '@/constants/theme';
-import { orders as ConstantOrders } from '@/constants/orders';
 import OrderCard from '@/components/orders/OrderCard';
-// No direct use of useAuth or authService in this file, but keeping the import style consistent
-// import { useAuth } from '@/contexts/AuthContext';
-// import { authService } from '@/services/authService';
+import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
+import { useAuth } from '@/contexts/AuthContext';
+import { Deliver } from '@/types/auth';
 
 const Orders = () => {
+  const { entity: deliver } = useAuth<Deliver>();
   const [selectedFilter, setSelectedFilter] = useState<
     'all' | 'available' | 'active'
   >('all');
 
-  const [orders, setOrders] = useState(ConstantOrders);
+  const {
+    allOrders,
+    availableOrders,
+    activeOrders,
+    isLoading,
+    refreshOrders,
+    acceptOrder,
+    declineOrder,
+  } = useDeliveryOrders();
 
-  const filteredOrders = orders.filter((order) => {
-    if (selectedFilter === 'available') return order.status === 'available';
-    if (selectedFilter === 'active')
-      return ['accepted', 'picked_up'].includes(order.status);
-    return true;
-  });
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleAcceptOrder = (orderId: string) => {
-    console.log('Accept order:', orderId);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        return order.id === orderId ? { ...order, status: 'accepted' } : order;
-      })
-    );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshOrders();
+    setRefreshing(false);
   };
 
-  const handleDeclineOrder = (orderId: string) => {
-    console.log('Decline order:', orderId);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        return order.id === orderId ? { ...order, status: 'rejected' } : order;
-      })
-    );
+  const filteredOrders =
+    selectedFilter === 'all'
+      ? allOrders
+      : selectedFilter === 'available'
+      ? availableOrders
+      : activeOrders;
+
+  const handleAcceptOrder = async (orderId: string) => {
+    if (!deliver?.id) return;
+    try {
+      await acceptOrder(orderId, deliver.id);
+    } catch (error) {
+      console.error('Failed to accept order:', error);
+    }
+  };
+
+  const handleDeclineOrder = async (orderId: string) => {
+    try {
+      await declineOrder(orderId);
+    } catch (error) {
+      console.error('Failed to decline order:', error);
+    }
   };
 
   const handleCall = (orderId: string) => {
@@ -87,7 +104,7 @@ const Orders = () => {
               selectedFilter === 'all' && styles.activeFilterTabText,
             ]}
           >
-            Toutes ({orders.length})
+            Toutes ({allOrders.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -104,8 +121,7 @@ const Orders = () => {
             ]}
             numberOfLines={1}
           >
-            Disponibles ({orders.filter((o) => o.status === 'available').length}
-            )
+            Disponibles ({availableOrders.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -121,44 +137,56 @@ const Orders = () => {
               selectedFilter === 'active' && styles.activeFilterTabText,
             ]}
           >
-            En cours (
-            {
-              orders.filter((o) => ['accepted', 'picked_up'].includes(o.status))
-                .length
-            }
-            )
+            En cours ({activeOrders.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Orders List */}
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredOrders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            onAccept={handleAcceptOrder}
-            onDecline={handleDeclineOrder}
-            onCall={handleCall}
-            onMessage={handleMessage}
-            onNavigate={handleNavigate}
-          />
-        ))}
-        {filteredOrders.length === 0 && (
-          <View style={styles.emptyState}>
-            <Package size={48} color={Theme.colors.neutral[300]} />
-            <Text style={styles.emptyStateTitle}>Aucune commande</Text>
-            <Text style={styles.emptyStateText}>
-              {selectedFilter === 'available'
-                ? 'Aucune commande disponible pour le moment'
-                : 'Aucune commande en cours'}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+      {isLoading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Theme.colors.primary[500]} />
+          <Text style={styles.loadingText}>Chargement des commandes...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Theme.colors.primary[500]]}
+              tintColor={Theme.colors.primary[500]}
+            />
+          }
+        >
+          {filteredOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              onAccept={handleAcceptOrder}
+              onDecline={handleDeclineOrder}
+              onCall={handleCall}
+              onMessage={handleMessage}
+              onNavigate={handleNavigate}
+            />
+          ))}
+          {filteredOrders.length === 0 && (
+            <View style={styles.emptyState}>
+              <Package size={48} color={Theme.colors.neutral[300]} />
+              <Text style={styles.emptyStateTitle}>Aucune commande</Text>
+              <Text style={styles.emptyStateText}>
+                {selectedFilter === 'available'
+                  ? 'Aucune commande disponible pour le moment'
+                  : selectedFilter === 'active'
+                  ? 'Aucune commande en cours'
+                  : 'Aucune commande trouvée'}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -230,6 +258,16 @@ const styles = StyleSheet.create({
     ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
     textAlign: 'center',
     paddingHorizontal: Theme.spacing['3xl'],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    ...createTextStyle('base', 'normal', Theme.colors.neutral[500]),
+    marginTop: Theme.spacing.md,
   },
 });
 
