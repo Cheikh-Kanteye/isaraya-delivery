@@ -49,19 +49,19 @@ export default function HomeScreen() {
     setIsOnline(newStatus);
 
     try {
-      console.log(deliver);
-
-      Reflect.deleteProperty(deliver!, 'createdAt');
-      Reflect.deleteProperty(deliver!, 'updatedAt');
-
       await updateProfile({
-        ...deliver,
+        firstName: deliver?.firstName || deliver?.name?.split(' ')[0],
+        lastName:
+          deliver?.lastName || deliver?.name?.split(' ').slice(1).join(' '),
+        email: deliver?.email,
+        phone: deliver?.phoneNumber,
+        role: deliver?.role,
+        isActive: deliver?.isActive,
         isOnline: newStatus,
       });
     } catch (error) {
       // Revert on error
       console.log(error);
-
       setIsOnline(!newStatus);
     }
   };

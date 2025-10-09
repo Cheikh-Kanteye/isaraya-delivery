@@ -49,7 +49,6 @@ const Orders = () => {
           else if (missionStatus === 'ACCEPTED') status = 'accepted';
           else if (missionStatus === 'IN_PROGRESS') status = 'picked_up';
           else if (missionStatus === 'DELIVERED') status = 'delivered';
-          else if (missionStatus === 'CANCELLED') status = 'rejected';
 
           return {
             id: mission.id,
@@ -82,6 +81,7 @@ const Orders = () => {
     };
 
     fetchOrders();
+    console.log('Orders fetched', JSON.stringify(orders, null, 2));
   }, []);
 
   const filteredOrders = orders.filter((order) => {

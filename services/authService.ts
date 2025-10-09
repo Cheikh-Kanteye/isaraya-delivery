@@ -260,7 +260,7 @@ export class AuthService<T extends BaseUser> {
   async updateProfile(data: Partial<T>): Promise<T> {
     try {
       const response = await this.makeRequest('/profile', {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify(data),
       });
 
