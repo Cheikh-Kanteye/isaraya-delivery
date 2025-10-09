@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Truck, Bell, Zap, Calendar, ChevronRight } from 'lucide-react-native';
+import { Truck, Bell, Zap, ChevronRight } from 'lucide-react-native';
 import { Theme } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Client } from '@/types/auth';
@@ -120,30 +120,6 @@ export default function ClientHomeScreenImproved() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Option Programmer */}
-          <TouchableOpacity
-            style={styles.scheduleOption}
-            onPress={() =>
-              router.push('/(client)/(tabs)/search?type=scheduled')
-            }
-            activeOpacity={0.8}
-          >
-            <View style={styles.scheduleIcon}>
-              <Calendar
-                size={20}
-                color={Theme.colors.accent[600]}
-                strokeWidth={2}
-              />
-            </View>
-            <View style={styles.scheduleContent}>
-              <Text style={styles.scheduleTitle}>Programmer une livraison</Text>
-              <Text style={styles.scheduleSubtitle}>
-                Planifier pour plus tard
-              </Text>
-            </View>
-            <ChevronRight size={20} color={Theme.colors.neutral[400]} />
-          </TouchableOpacity>
         </View>
 
         {/* Section d'aide rapide */}

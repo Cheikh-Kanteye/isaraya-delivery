@@ -1,18 +1,18 @@
 export const Colors = {
   // Primary Colors
   primary: {
-    50: '#f0fdf4',
-    100: '#dcfce7',
-    200: '#bbf7d0',
-    300: '#86efac',
-    400: '#4ade80',
-    500: '#10B981', // Main brand color
-    600: '#059669',
-    700: '#047857',
-    800: '#065f46',
-    900: '#064e3b',
+    50: '#fff7ed',
+    100: '#ffedd5',
+    200: '#fed7aa',
+    300: '#fdba74',
+    400: '#fb923c',
+    500: '#fb8618', // Main brand color
+    600: '#ea580c',
+    700: '#c2410c',
+    800: '#9a3412',
+    900: '#7c2d12',
   },
-  
+
   // Secondary Colors
   secondary: {
     50: '#eff6ff',
@@ -26,7 +26,7 @@ export const Colors = {
     800: '#1e40af',
     900: '#1e3a8a',
   },
-  
+
   // Accent Colors
   accent: {
     50: '#fefce8',
@@ -40,7 +40,7 @@ export const Colors = {
     800: '#92400e',
     900: '#78350f',
   },
-  
+
   // Success Colors
   success: {
     50: '#f0fdf4',
@@ -54,7 +54,7 @@ export const Colors = {
     800: '#166534',
     900: '#14532d',
   },
-  
+
   // Warning Colors
   warning: {
     50: '#fefce8',
@@ -68,7 +68,7 @@ export const Colors = {
     800: '#854d0e',
     900: '#713f12',
   },
-  
+
   // Error Colors
   error: {
     50: '#fef2f2',
@@ -82,7 +82,7 @@ export const Colors = {
     800: '#991b1b',
     900: '#7f1d1d',
   },
-  
+
   // Neutral Colors
   neutral: {
     50: '#f9fafb',
@@ -96,7 +96,7 @@ export const Colors = {
     800: '#1f2937',
     900: '#111827',
   },
-  
+
   // Special Colors
   white: '#ffffff',
   black: '#000000',
@@ -111,7 +111,7 @@ export const Typography = {
     semiBold: 'System',
     bold: 'System',
   },
-  
+
   // Font Sizes
   fontSize: {
     xs: 12,
@@ -124,7 +124,7 @@ export const Typography = {
     '4xl': 36,
     '5xl': 48,
   },
-  
+
   // Font Weights
   fontWeight: {
     normal: '400' as const,
@@ -132,7 +132,7 @@ export const Typography = {
     semibold: '600' as const,
     bold: '700' as const,
   },
-  
+
   // Line Heights
   lineHeight: {
     tight: 1.2,
@@ -144,7 +144,7 @@ export const Typography = {
 export const Spacing = {
   // Base spacing unit (8px)
   unit: 8,
-  
+
   // Spacing scale
   xs: 4,
   sm: 8,
@@ -210,7 +210,7 @@ export const Layout = {
     lg: 1024,
     xl: 1280,
   },
-  
+
   // Common dimensions
   tabBarHeight: 80,
   headerHeight: 60,
@@ -236,7 +236,9 @@ export const Theme = {
 };
 
 // Helper functions for common patterns
-export const createButtonStyle = (variant: 'primary' | 'secondary' | 'outline' | 'ghost') => {
+export const createButtonStyle = (
+  variant: 'primary' | 'secondary' | 'outline' | 'ghost'
+) => {
   const baseStyle = {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,

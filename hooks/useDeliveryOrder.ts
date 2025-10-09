@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Alert } from 'react-native';
-import { DeliveryRequest, Payment } from '@/types/client';
+import * as WebBrowser from 'expo-web-browser';
+import { DeliveryRequest } from '@/types/client';
 import { Client } from '@/types/auth';
 import { deliveryService } from '@/services/deliveryService';
 import { paymentService } from '@/services/paiementService';
@@ -54,30 +55,21 @@ export function useDeliveryOrder(client: Client | undefined) {
 
     try {
       setIsLoading(true);
-      const deliveryRequestData: Omit<
-        DeliveryRequest,
-        | 'id'
-        | 'status'
-        | 'createdAt'
-        | 'deliveryFee'
-        | 'estimatedDuration'
-        | 'distance'
-      > = {
-        clientId: client.id,
+      const deliveryRequestData = {
         pickupAddress,
         pickupLatitude: pickupCoordinates.lat,
         pickupLongitude: pickupCoordinates.lng,
         destinationAddress: deliveryAddress,
         destinationLatitude: deliveryCoordinates.lat,
         destinationLongitude: deliveryCoordinates.lng,
-        description,
-        urgency,
         deliveryType,
       };
 
       const createdDeliveryRequest =
         await deliveryService.createDeliveryRequest(deliveryRequestData);
-      setDeliveryRequest(createdDeliveryRequest);
+      setDeliveryRequest(createdDeliveryRequest.payload);
+
+      console.log('Demande de livraison créée:', createdDeliveryRequest);
 
       onSuccess();
     } catch (error) {
@@ -100,19 +92,24 @@ export function useDeliveryOrder(client: Client | undefined) {
 
     try {
       setIsLoading(true);
-      const paymentData: Omit<Payment, 'id' | 'status' | 'createdAt'> = {
-        deliveryId: deliveryRequest.id,
-        clientId: client!.id,
-        amount: deliveryRequest.deliveryFee,
-        method: paymentMethod,
-        tip: 0,
+      const paymentData = {
+        orderId: deliveryRequest.id,
+        item_price: deliveryRequest.deliveryFee,
+        command_name: 'Commande Isaraya',
+        currency: 'XOF',
+        target_payment:
+          paymentMethod === 'orange_money' ? 'Orange Money' : 'Wave',
+        custom_field: {},
+        user: {
+          phone_number: client!.phoneNumber,
+          first_name: client!.firstName,
+          last_name: client!.lastName,
+        },
+        origin: 'MARKETPLACE',
       };
-      await paymentService.processPayment(paymentData);
-      Alert.alert(
-        'Paiement confirmé !',
-        'Votre paiement a été traité avec succès. Un livreur vous sera assigné sous peu.',
-        [{ text: 'OK', onPress: onSuccess }]
-      );
+      const result = await paymentService.initiatePayment(paymentData);
+      await WebBrowser.openBrowserAsync(result.redirectUrl);
+      onSuccess();
     } catch (error) {
       Alert.alert(
         'Erreur de paiement',

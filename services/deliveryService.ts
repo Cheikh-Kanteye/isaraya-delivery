@@ -1,5 +1,5 @@
 import { API_URL, STORAGE_KEYS } from '@/constants';
-import { DeliveryRequest } from '@/types/client';
+import { DeliveryRequest, DeliveryResponse } from '@/types/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types for delivery endpoints
@@ -35,17 +35,15 @@ export const deliveryService = {
     return headers;
   },
 
-  async createDeliveryRequest(
-    deliveryRequestData: Omit<
-      DeliveryRequest,
-      | 'id'
-      | 'status'
-      | 'createdAt'
-      | 'deliveryFee'
-      | 'distance'
-      | 'estimatedDuration'
-    >
-  ): Promise<DeliveryRequest> {
+  async createDeliveryRequest(deliveryRequestData: {
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+    destinationAddress: string;
+    destinationLatitude: number;
+    destinationLongitude: number;
+    deliveryType: 'STANDARD' | 'EXPRESS';
+  }): Promise<any> {
     try {
       const headers = await this.getHeaders();
 
@@ -80,7 +78,7 @@ export const deliveryService = {
     }
   },
 
-  async getMissionById(id: string): Promise<DeliveryRequest> {
+  async getMissionById(id: string): Promise<DeliveryResponse> {
     try {
       const headers = await this.getHeaders();
 
@@ -103,7 +101,7 @@ export const deliveryService = {
     }
   },
 
-  async getClientMissions(): Promise<DeliveryRequest[]> {
+  async getClientMissions(): Promise<DeliveryResponse> {
     try {
       const headers = await this.getHeaders();
 
@@ -126,7 +124,7 @@ export const deliveryService = {
     }
   },
 
-  async getDelivererMissions(): Promise<DeliveryRequest[]> {
+  async getDelivererMissions(): Promise<DeliveryResponse> {
     try {
       const headers = await this.getHeaders();
 
@@ -149,7 +147,7 @@ export const deliveryService = {
     }
   },
 
-  async getPendingMissions(): Promise<DeliveryRequest[]> {
+  async getPendingMissions(): Promise<DeliveryResponse> {
     try {
       const headers = await this.getHeaders();
 

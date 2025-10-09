@@ -1,3 +1,4 @@
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -5,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -15,16 +17,48 @@ import {
   LogOut,
   ChevronRight,
   Package,
-  Star,
-  Gift,
 } from 'lucide-react-native';
-import { Theme, createCardStyle, createTextStyle } from '@/constants/theme';
+import { Theme, createTextStyle } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { profileMenuItems } from '@/constants/profile-menu-items';
 import { Client } from '@/types/auth';
+import { DeliveryRequest } from '@/types/client';
+import { deliveryService } from '@/services/deliveryService';
 
 export default function ClientProfileScreen() {
   const { entity: client, logout } = useAuth<Client>();
+  const [orders, setOrders] = useState<DeliveryRequest[]>([]);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      const clientMissions = await deliveryService.getClientMissions();
+      if (clientMissions && Array.isArray(clientMissions.payload)) {
+        setOrders(clientMissions.payload);
+      } else {
+        setOrders([]);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -40,150 +74,181 @@ export default function ClientProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <Image
-            source={{
-              uri:
-                client.profilePicture ||
-                'https://images.pexels.com/photos/3763188/pexels-photo-3763188.jpeg?auto=compress&cs=tinysrgb&w=150',
-            }}
-            style={styles.profilePicture}
-          />
-          <View style={styles.profileInfo}>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Animated.View
+            style={[
+              styles.profileHeader,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {client.profilePicture ? (
+              <Image
+                source={{ uri: client.profilePicture }}
+                style={styles.profilePicture}
+              />
+            ) : (
+              <View style={styles.profilePicture}>
+                <Text style={styles.initialsText}>
+                  {(client.firstName + ' ' + client.lastName)
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </Text>
+              </View>
+            )}
             <Text style={styles.userName}>{client.name}</Text>
             <Text style={styles.memberSince}>
-              Membre depuis {client.memberSince}
+              Membre depuis {client.createdAt?.split('T')[0]}
             </Text>
-          </View>
+          </Animated.View>
         </View>
 
         {/* Stats Card */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Package
-              size={Theme.layout.iconSize.md}
-              color={Theme.colors.primary[500]}
-            />
-            <Text style={styles.statValue}>{client.totalDeliveries}</Text>
-            <Text style={styles.statLabel}>Commandes</Text>
+        <Animated.View
+          style={[
+            styles.statsContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Package
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>{orders.length || 0}</Text>
+              <Text style={styles.statLabel}>Commandes</Text>
+            </View>
           </View>
-          <View style={styles.statItem}>
-            <Star
-              size={Theme.layout.iconSize.md}
-              color={Theme.colors.accent[500]}
-            />
-            <Text style={styles.statValue}>4.9</Text>
-            <Text style={styles.statLabel}>Note moyenne</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Gift
-              size={Theme.layout.iconSize.md}
-              color={Theme.colors.secondary[500]}
-            />
-            <Text style={styles.statValue}>1,250</Text>
-            <Text style={styles.statLabel}>Points fidélité</Text>
-          </View>
-        </View>
+        </Animated.View>
 
         {/* Contact Info */}
-        <View style={styles.contactCard}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations de contact</Text>
-
-          <View style={styles.contactItem}>
-            <Mail
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.contactText}>{client.email}</Text>
-          </View>
-
-          <View style={styles.contactItem}>
-            <Phone
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.contactText}>{client.phone}</Text>
-          </View>
-
-          {client.defaultAddress && (
-            <View style={styles.contactItem}>
-              <MapPin
-                size={Theme.layout.iconSize.xs}
+          <View style={styles.infoCard}>
+            <View style={styles.infoItem}>
+              <Mail
+                size={Theme.layout.iconSize.sm}
                 color={Theme.colors.neutral[500]}
+                strokeWidth={2}
               />
-              <Text style={styles.contactText}>{client.defaultAddress}</Text>
+              <Text style={styles.infoText}>{client.email}</Text>
             </View>
-          )}
+
+            <View style={styles.infoDivider} />
+
+            <View style={styles.infoItem}>
+              <Phone
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.neutral[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.infoText}>{client.phone}</Text>
+            </View>
+
+            {client.defaultAddress && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <MapPin
+                    size={Theme.layout.iconSize.sm}
+                    color={Theme.colors.neutral[500]}
+                    strokeWidth={2}
+                  />
+                  <Text style={styles.infoText}>{client.defaultAddress}</Text>
+                </View>
+              </>
+            )}
+          </View>
         </View>
 
         {/* Payment Info */}
         {client.mobileMoneyNumber && (
-          <View style={styles.paymentCard}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Paiement principal</Text>
-            <View style={styles.paymentMethod}>
-              <View style={styles.paymentIcon}>
+            <View style={styles.paymentCard}>
+              <View style={styles.paymentContent}>
                 <CreditCard
-                  size={Theme.layout.iconSize.sm}
-                  color={Theme.colors.accent[500]}
+                  size={Theme.layout.iconSize.md}
+                  color={Theme.colors.primary[500]}
+                  strokeWidth={2}
                 />
-              </View>
-              <View style={styles.paymentInfo}>
-                <Text style={styles.paymentTitle}>Mobile Money</Text>
-                <Text style={styles.paymentNumber}>
-                  {client.mobileMoneyNumber}
-                </Text>
+                <View style={styles.paymentInfo}>
+                  <Text style={styles.paymentTitle}>Mobile Money</Text>
+                  <Text style={styles.paymentNumber}>
+                    {client.mobileMoneyNumber}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
         )}
 
         {/* Menu Items */}
-        <View style={styles.menuCard}>
-          {profileMenuItems.map(({ icon: Icon, ...item }) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.menuItem}
-              onPress={item.action}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
+        <View style={styles.section}>
+          <View style={styles.menuCard}>
+            {profileMenuItems.map(({ icon: Icon, ...item }, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.menuItem,
+                  index === profileMenuItems.length - 1 && styles.menuItemLast,
+                ]}
+                onPress={item.action}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuItemLeft}>
                   <Icon
                     size={Theme.layout.iconSize.sm}
                     color={Theme.colors.neutral[500]}
+                    strokeWidth={2}
                   />
+                  <View style={styles.menuItemContent}>
+                    <Text style={styles.menuItemTitle}>{item.title}</Text>
+                    <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                  </View>
                 </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
-                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <ChevronRight
-                size={Theme.layout.iconSize.sm}
-                color={Theme.colors.neutral[300]}
-              />
-            </TouchableOpacity>
-          ))}
+                <ChevronRight
+                  size={Theme.layout.iconSize.sm}
+                  color={Theme.colors.neutral[300]}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut
-            size={Theme.layout.iconSize.sm}
-            color={Theme.colors.error[500]}
-          />
-          <Text style={styles.logoutText}>Se déconnecter</Text>
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            activeOpacity={0.8}
+          >
+            <LogOut
+              size={Theme.layout.iconSize.sm}
+              color={Theme.colors.error[500]}
+              strokeWidth={2}
+            />
+            <Text style={styles.logoutText}>Se déconnecter</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* App Version */}
+        {/* Version */}
         <View style={styles.versionContainer}>
           <Text style={styles.versionText}>Version Client 1.0.0</Text>
         </View>
@@ -197,167 +262,177 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Theme.colors.neutral[50],
   },
-  header: {
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.neutral[200],
-  },
-  headerTitle: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.neutral[900]),
-  },
   scrollView: {
     flex: 1,
   },
-  profileCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-    flexDirection: 'row',
+
+  // Hero Section
+  heroSection: {
+    paddingTop: Theme.spacing['6xl'],
+    paddingBottom: Theme.spacing['7xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
+    backgroundColor: Theme.colors.primary[50],
+  },
+  profileHeader: {
     alignItems: 'center',
   },
   profilePicture: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
     borderRadius: Theme.borderRadius.full,
-    marginRight: Theme.spacing.lg,
+    borderWidth: 4,
+    borderColor: Theme.colors.white,
+    marginBottom: Theme.spacing.lg,
+    backgroundColor: Theme.colors.neutral[200],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profileInfo: {
-    flex: 1,
+  initialsText: {
+    ...createTextStyle('4xl', 'bold', Theme.colors.primary[500]),
+    letterSpacing: 2,
   },
   userName: {
-    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+    ...createTextStyle('3xl', 'bold', Theme.colors.neutral[900]),
     marginBottom: Theme.spacing.xs,
+    letterSpacing: -0.5,
   },
   memberSince: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    opacity: 0.8,
+  },
+
+  // Stats Section
+  statsContainer: {
+    marginTop: -50,
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['3xl'],
   },
   statsCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing['2xl'],
+    alignItems: 'center',
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+    ...createTextStyle('4xl', 'bold', Theme.colors.neutral[900]),
     marginTop: Theme.spacing.sm,
     marginBottom: Theme.spacing.xs,
   },
   statLabel: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
   },
-  contactCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+
+  // Section
+  section: {
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['2xl'],
   },
   sectionTitle: {
     ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-    marginBottom: Theme.spacing.lg,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.md,
     marginBottom: Theme.spacing.md,
   },
-  contactText: {
-    ...createTextStyle('base', 'normal', Theme.colors.neutral[700]),
+
+  // Info Card
+  infoCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
-  paymentCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-  },
-  paymentMethod: {
+  infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
   },
-  paymentIcon: {
-    width: Theme.layout.iconSize.xl,
-    height: Theme.layout.iconSize.xl,
-    backgroundColor: Theme.colors.accent[100],
-    borderRadius: Theme.borderRadius.full,
+  infoText: {
+    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
+    flex: 1,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.neutral[100],
+  },
+
+  // Payment Card
+  paymentCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+  },
+  paymentContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Theme.spacing.md,
+    gap: Theme.spacing.lg,
   },
   paymentInfo: {
     flex: 1,
   },
   paymentTitle: {
-    ...createTextStyle('base', 'semibold', Theme.colors.neutral[900]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
     marginBottom: Theme.spacing.xs,
   },
   paymentNumber: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
   },
+
+  // Menu Card
   menuCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-    padding: 0,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
+    padding: Theme.spacing.xl,
     borderBottomWidth: 1,
     borderBottomColor: Theme.colors.neutral[100],
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  menuIcon: {
-    width: Theme.layout.iconSize.xl,
-    height: Theme.layout.iconSize.xl,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Theme.spacing.md,
+    gap: Theme.spacing.lg,
   },
   menuItemContent: {
     flex: 1,
   },
   menuItemTitle: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[900]),
+    ...createTextStyle('base', 'semibold', Theme.colors.neutral[900]),
     marginBottom: 2,
   },
   menuItemSubtitle: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'normal', Theme.colors.neutral[400]),
   },
+
+  // Logout Button
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Theme.colors.white,
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
     padding: Theme.spacing.lg,
-    borderRadius: Theme.borderRadius.lg,
-    gap: Theme.spacing.sm,
-    ...Theme.shadows.md,
+    borderRadius: Theme.borderRadius.xl,
+    gap: Theme.spacing.md,
   },
   logoutText: {
-    ...createTextStyle('base', 'semibold', Theme.colors.error[500]),
+    ...createTextStyle('lg', 'semibold', Theme.colors.error[500]),
   },
+
+  // Version
   versionContainer: {
     alignItems: 'center',
-    paddingVertical: Theme.spacing.xl,
+    paddingVertical: Theme.spacing['3xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
   },
   versionText: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[400]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[400]),
   },
 });
-
-

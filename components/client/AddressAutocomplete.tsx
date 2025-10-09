@@ -10,15 +10,19 @@ import {
   StyleSheet,
   Platform,
   TextInput,
-  FlatList,
   TouchableOpacity,
   Text,
   ActivityIndicator,
+  Modal,
+  FlatList,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Theme } from '@/constants/theme';
 
-// Types pour les résultats Nominatim
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 interface NominatimResult {
   place_id: number;
   licence: string;
@@ -33,7 +37,6 @@ interface NominatimResult {
   importance: number;
 }
 
-// Define prop types
 interface AddressAutocompleteProps {
   placeholder: string;
   value?: string;
@@ -43,9 +46,9 @@ interface AddressAutocompleteProps {
   ) => void;
   iconColor?: string;
   style?: any;
+  label?: string;
 }
 
-// Define ref interface
 export interface AddressAutocompleteRef {
   setAddressText: (text: string) => void;
   getAddressText: () => string;
@@ -65,6 +68,7 @@ const AddressAutocomplete = forwardRef<
       onAddressSelect,
       iconColor = Theme.colors.primary[500],
       style,
+      label,
     },
     ref
   ) => {
@@ -72,37 +76,35 @@ const AddressAutocomplete = forwardRef<
     const [searchText, setSearchText] = useState(value || '');
     const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
     const [loading, setLoading] = useState(false);
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
     const searchTimeoutRef = useRef<number | null>(null);
+    const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-    // Fonction pour rechercher des adresses via Nominatim
     const searchAddresses = useCallback(async (query: string) => {
       if (query.length < 3) {
         setSuggestions([]);
-        setShowSuggestions(false);
         return;
       }
 
       setLoading(true);
 
       try {
-        // Configuration de la recherche pour le Sénégal
         const params = new URLSearchParams({
           q: query,
           format: 'json',
           addressdetails: '1',
-          limit: '5',
-          countrycodes: 'sn', // Limiter au Sénégal
+          limit: '8',
+          countrycodes: 'sn',
           'accept-language': 'fr',
           bounded: '1',
-          viewbox: '-17.7,14.0,-16.9,14.9', // Bbox approximatif pour Dakar
+          viewbox: '-17.7,14.0,-16.9,14.9',
         });
 
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?${params.toString()}`,
           {
             headers: {
-              'User-Agent': 'YourAppName/1.0', // Remplacez par le nom de votre app
+              'User-Agent': 'YourAppName/1.0',
             },
           }
         );
@@ -110,22 +112,17 @@ const AddressAutocomplete = forwardRef<
         if (response.ok) {
           const results: NominatimResult[] = await response.json();
           setSuggestions(results);
-          setShowSuggestions(results.length > 0);
         } else {
-          console.error('Nominatim API error:', response.status);
           setSuggestions([]);
-          setShowSuggestions(false);
         }
       } catch (error) {
         console.error('Error fetching addresses:', error);
         setSuggestions([]);
-        setShowSuggestions(false);
       } finally {
         setLoading(false);
       }
     }, []);
 
-    // Debounced search
     const handleTextChange = useCallback(
       (text: string) => {
         setSearchText(text);
@@ -134,14 +131,38 @@ const AddressAutocomplete = forwardRef<
           clearTimeout(searchTimeoutRef.current);
         }
 
-        searchTimeoutRef.current = setTimeout(() => {
-          searchAddresses(text);
-        }, 500);
+        if (text.length >= 3) {
+          searchTimeoutRef.current = setTimeout(() => {
+            searchAddresses(text);
+          }, 500);
+        } else {
+          setSuggestions([]);
+        }
       },
       [searchAddresses]
     );
 
-    // Gestion de la sélection d'une suggestion
+    const openModal = () => {
+      setModalVisible(true);
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 90,
+      }).start();
+    };
+
+    const closeModal = useCallback(() => {
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setModalVisible(false);
+        setSuggestions([]);
+      });
+    }, []);
+
     const handleSuggestionSelect = useCallback(
       (item: NominatimResult) => {
         const coordinates = {
@@ -150,14 +171,12 @@ const AddressAutocomplete = forwardRef<
         };
 
         setSearchText(item.display_name);
-        setShowSuggestions(false);
-        setSuggestions([]);
         onAddressSelect(item.display_name, coordinates);
+        closeModal();
       },
-      [onAddressSelect]
+      [onAddressSelect, closeModal]
     );
 
-    // Expose methods via ref
     useImperativeHandle(ref, () => ({
       setAddressText: (text: string) => {
         setSearchText(text);
@@ -166,84 +185,147 @@ const AddressAutocomplete = forwardRef<
         return searchText;
       },
       focus: () => {
-        textInputRef.current?.focus();
+        openModal();
       },
       blur: () => {
-        textInputRef.current?.blur();
-        setShowSuggestions(false);
+        closeModal();
       },
       clear: () => {
         setSearchText('');
         setSuggestions([]);
-        setShowSuggestions(false);
       },
     }));
 
-    // Rendu d'une suggestion
     const renderSuggestion = ({ item }: { item: NominatimResult }) => (
       <TouchableOpacity
-        style={styles.row}
+        style={styles.suggestionItem}
         onPress={() => handleSuggestionSelect(item)}
+        activeOpacity={0.7}
       >
-        <Icon
-          name="map-pin"
-          size={14}
-          color={Theme.colors.neutral[400]}
-          style={styles.suggestionIcon}
-        />
-        <Text style={styles.description} numberOfLines={2}>
+        <View style={styles.suggestionIconContainer}>
+          <Icon name="map-pin" size={18} color={iconColor} />
+        </View>
+        <Text style={styles.suggestionText} numberOfLines={2}>
           {item.display_name}
         </Text>
+        <Icon
+          name="chevron-right"
+          size={18}
+          color={Theme.colors.neutral[400]}
+        />
       </TouchableOpacity>
     );
 
     return (
       <View style={[styles.container, style]}>
-        <View style={styles.textInputContainer}>
+        <TouchableOpacity
+          style={styles.inputContainer}
+          onPress={openModal}
+          activeOpacity={0.8}
+        >
           <View style={styles.inputIcon}>
-            <Icon name="map-pin" size={16} color={iconColor} />
+            <Icon name="map-pin" size={18} color={iconColor} />
           </View>
-          <TextInput
-            ref={textInputRef}
-            style={styles.textInput}
-            placeholder={placeholder}
-            placeholderTextColor={Theme.colors.neutral[400]}
-            value={searchText}
-            onChangeText={handleTextChange}
-            onFocus={() => {
-              if (suggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-            onBlur={() => {
-              // Délai pour permettre la sélection
-              setTimeout(() => setShowSuggestions(false), 150);
-            }}
-            {...(Platform.OS === 'android' && {
-              underlineColorAndroid: 'transparent',
-            })}
-          />
-          {loading && (
-            <ActivityIndicator
-              size="small"
-              color={iconColor}
-              style={styles.loadingIndicator}
-            />
-          )}
-        </View>
+          <Text
+            style={[styles.inputText, !searchText && styles.placeholderText]}
+            numberOfLines={1}
+          >
+            {searchText || placeholder}
+          </Text>
+          <Icon name="search" size={18} color={Theme.colors.neutral[400]} />
+        </TouchableOpacity>
 
-        {showSuggestions && suggestions.length > 0 && (
-          <View style={styles.listView}>
-            <FlatList
-              data={suggestions}
-              renderItem={renderSuggestion}
-              keyExtractor={(item) => item.place_id.toString()}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="none"
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={closeModal}
             />
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View style={styles.modalHandle} />
+
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {label || 'Rechercher une adresse'}
+                </Text>
+                <TouchableOpacity
+                  onPress={closeModal}
+                  style={styles.closeButton}
+                >
+                  <Icon name="x" size={24} color={Theme.colors.neutral[600]} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.searchContainer}>
+                <View style={styles.searchInputContainer}>
+                  <Icon
+                    name="search"
+                    size={18}
+                    color={Theme.colors.neutral[400]}
+                    style={styles.searchIcon}
+                  />
+                  <TextInput
+                    ref={textInputRef}
+                    style={styles.searchInput}
+                    placeholder="Tapez au moins 3 caractères..."
+                    placeholderTextColor={Theme.colors.neutral[400]}
+                    value={searchText}
+                    onChangeText={handleTextChange}
+                    autoFocus
+                    {...(Platform.OS === 'android' && {
+                      underlineColorAndroid: 'transparent',
+                    })}
+                  />
+                  {loading && (
+                    <ActivityIndicator
+                      size="small"
+                      color={iconColor}
+                      style={styles.loadingIndicator}
+                    />
+                  )}
+                </View>
+              </View>
+
+              {suggestions.length > 0 ? (
+                <FlatList
+                  data={suggestions}
+                  renderItem={renderSuggestion}
+                  keyExtractor={(item) => item.place_id.toString()}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.suggestionsList}
+                />
+              ) : (
+                <View style={styles.emptyState}>
+                  <Icon
+                    name="map-pin"
+                    size={48}
+                    color={Theme.colors.neutral[300]}
+                  />
+                  <Text style={styles.emptyStateText}>
+                    {searchText.length < 3
+                      ? 'Commencez à taper pour rechercher'
+                      : loading
+                      ? 'Recherche en cours...'
+                      : 'Aucune adresse trouvée'}
+                  </Text>
+                </View>
+              )}
+            </Animated.View>
           </View>
-        )}
+        </Modal>
       </View>
     );
   }
@@ -251,9 +333,75 @@ const AddressAutocomplete = forwardRef<
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Theme.colors.neutral[200],
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  inputText: {
+    flex: 1,
+    fontSize: 15,
+    color: Theme.colors.neutral[800],
+  },
+  placeholderText: {
+    color: Theme.colors.neutral[400],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
     flex: 1,
   },
-  textInputContainer: {
+  modalContent: {
+    backgroundColor: Theme.colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: Theme.colors.neutral[300],
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.neutral[100],
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Theme.colors.neutral[900],
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Theme.colors.neutral[50],
@@ -261,60 +409,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Theme.colors.neutral[200],
     paddingHorizontal: 12,
-    height: 50,
+    height: 48,
   },
-  textInput: {
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: Theme.colors.neutral[800],
-    backgroundColor: 'transparent',
-    paddingLeft: 8,
-    paddingRight: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    marginLeft: 0,
-    marginRight: 0,
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  inputIcon: {
-    marginRight: 4,
   },
   loadingIndicator: {
     marginLeft: 8,
   },
-  listView: {
-    backgroundColor: Theme.colors.white,
-    borderRadius: 12,
-    marginTop: 4,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    maxHeight: 200,
-    zIndex: 1000,
+  suggestionsList: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  row: {
-    backgroundColor: Theme.colors.white,
-    padding: 16,
-    minHeight: 58,
+  suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.neutral[100],
   },
-  suggestionIcon: {
+  suggestionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Theme.colors.neutral[50],
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
-  separator: {
-    height: 1,
-    backgroundColor: Theme.colors.neutral[100],
-    marginLeft: 48, // Align with text after icon
-    marginRight: 16,
-  },
-  description: {
+  suggestionText: {
+    flex: 1,
     fontSize: 14,
     color: Theme.colors.neutral[800],
+    lineHeight: 20,
+  },
+  emptyState: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: Theme.colors.neutral[500],
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 

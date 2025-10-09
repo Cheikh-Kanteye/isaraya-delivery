@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Search, Package, User } from 'lucide-react-native';
+import { Home, Search, Package, User, ShoppingBag } from 'lucide-react-native';
 import { Theme } from '@/constants/theme';
 
 export default function ClientTabLayout() {
@@ -34,8 +34,10 @@ export default function ClientTabLayout() {
         name="search"
         options={{
           headerShown: false,
-          title: 'Rechercher',
-          tabBarIcon: ({ size, color }) => <Search size={size} color={color} />,
+          title: 'Commander',
+          tabBarIcon: ({ size, color }) => (
+            <ShoppingBag size={size} color={color} />
+          ),
           tabBarHideOnKeyboard: true,
         }}
       />

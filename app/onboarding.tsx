@@ -1,24 +1,46 @@
-import React, { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Truck, Package, Zap, CreditCard, MapPin } from 'lucide-react-native';
+import {
+  Truck,
+  Zap,
+  CreditCard,
+  MapPin,
+  ArrowRight,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthLoader from '@/components/common/AuthLoader';
 import { BaseUser } from '@/types/auth';
+import { Theme } from '@/constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
-export default function WelcomeScreenClean() {
+export default function WelcomeScreenModern() {
   const router = useRouter();
   const { isAuthenticated, entity, isLoading } = useAuth<BaseUser>();
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const iconAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    // Redirect authenticated users to appropriate screens
+    // Redirect authenticated users
     if (isAuthenticated && entity) {
       if (entity.role === 'client') {
         router.replace('/(client)/(tabs)');
@@ -27,117 +49,284 @@ export default function WelcomeScreenClean() {
       }
       return;
     }
+
+    // Start animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Stagger icon animations
+    iconAnims.forEach((anim, index) => {
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 500,
+        delay: 800 + index * 150,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    // Floating animation for decorative elements
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Pulse animation for button
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, [isAuthenticated, entity, router]);
 
-  // Show loading indicator while authentication is being checked
   if (isLoading) {
     return <AuthLoader message="Vérification de vos informations..." />;
   }
 
+  const floatInterpolate = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -20],
+  });
+
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          {/* Header épuré */}
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>Livraison</Text>
-            <Text style={styles.subtitle}>
-              Choisissez votre profil pour commencer
-            </Text>
-          </View>
+      <LinearGradient
+        colors={['#FFFFFF', '#FEF3C7', '#FFFFFF']}
+        style={styles.gradient}
+      >
+        <SafeAreaView style={styles.container}>
+          {/* Decorative animated circles */}
+          <Animated.View
+            style={[
+              styles.decorCircle1,
+              {
+                transform: [{ translateY: floatInterpolate }],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.decorCircle2,
+              {
+                transform: [
+                  {
+                    translateY: floatAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 15],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
 
-          {/* Cartes de profil épurées */}
-          <View style={styles.profileSection}>
-            <TouchableOpacity
-              style={[styles.profileCard, styles.clientCard]}
-              onPress={() => router.push('/(client)/client-auth')}
-              activeOpacity={0.95}
+          <View style={styles.content}>
+            {/* Animated Header */}
+            <Animated.View
+              style={[
+                styles.header,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                },
+              ]}
             >
-              <View style={styles.cardContent}>
-                <View style={[styles.iconContainer, styles.clientIcon]}>
-                  <Package size={28} color="#6366F1" strokeWidth={2} />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Client</Text>
-                  <Text style={styles.cardDescription}>
-                    Commander une livraison
-                  </Text>
-                </View>
+              <View style={styles.logoContainer}>
+                <LinearGradient
+                  colors={['#FCD34D', Theme.colors.primary[500]]}
+                  style={styles.logoGradient}
+                >
+                  <Truck size={40} color="#FFFFFF" strokeWidth={2.5} />
+                </LinearGradient>
               </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.profileCard, styles.driverCard]}
-              onPress={() => router.push('/(deliver)/deliver-auth')}
-              activeOpacity={0.95}
+              <Text style={styles.appTitle}>
+                i<Text style={{ color: Theme.colors.black }}>Delivery</Text>
+              </Text>
+              <Text style={styles.subtitle}>
+                Votre solution de livraison rapide et fiable
+              </Text>
+            </Animated.View>
+
+            {/* Animated Features Cards */}
+            <View style={styles.featuresSection}>
+              {[
+                {
+                  icon: Zap,
+                  text: 'Livraison express',
+                  color: Theme.colors.primary[500],
+                },
+                { icon: CreditCard, text: 'Paiement mobile', color: '#8B5CF6' },
+                { icon: MapPin, text: 'Suivi temps réel', color: '#3B82F6' },
+              ].map((feature, index) => (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.featureCard,
+                    {
+                      opacity: iconAnims[index],
+                      transform: [
+                        {
+                          translateX: iconAnims[index].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-50, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[`${feature.color}20`, `${feature.color}10`]}
+                    style={styles.featureIconContainer}
+                  >
+                    <feature.icon
+                      size={24}
+                      color={feature.color}
+                      strokeWidth={2.5}
+                    />
+                  </LinearGradient>
+                  <View style={styles.featureTextContainer}>
+                    <Text style={styles.featureText}>{feature.text}</Text>
+                  </View>
+                </Animated.View>
+              ))}
+            </View>
+
+            {/* Animated Button */}
+            <Animated.View
+              style={[
+                styles.buttonSection,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: pulseAnim }],
+                },
+              ]}
             >
-              <View style={styles.cardContent}>
-                <View style={[styles.iconContainer, styles.driverIcon]}>
-                  <Truck size={28} color="#10B981" strokeWidth={2} />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Livreur</Text>
-                  <Text style={styles.cardDescription}>
-                    Effectuer des livraisons
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={() => router.push('/auth')}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={[Theme.colors.primary[500], '#D97706']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.startButtonText}>Commencer</Text>
+                  <ArrowRight size={20} color="#FFFFFF" strokeWidth={2.5} />
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <Text style={styles.bottomText}>
+                Rejoignez des milliers d&apos;utilisateurs satisfaits 🚀
+              </Text>
+            </Animated.View>
           </View>
-
-          {/* Fonctionnalités épurées */}
-          <View style={styles.featuresSection}>
-            <View style={styles.feature}>
-              <View style={styles.featureIcon}>
-                <Zap size={20} color="#F59E0B" strokeWidth={2} />
-              </View>
-              <Text style={styles.featureText}>Livraison express</Text>
-            </View>
-
-            <View style={styles.feature}>
-              <View style={styles.featureIcon}>
-                <CreditCard size={20} color="#F59E0B" strokeWidth={2} />
-              </View>
-              <Text style={styles.featureText}>Paiement mobile</Text>
-            </View>
-
-            <View style={styles.feature}>
-              <View style={styles.featureIcon}>
-                <MapPin size={20} color="#F59E0B" strokeWidth={2} />
-              </View>
-              <Text style={styles.featureText}>Suivi en temps réel</Text>
-            </View>
-          </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </LinearGradient>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+    justifyContent: 'space-between',
   },
 
-  // Header épuré
+  // Decorative elements
+  decorCircle1: {
+    position: 'absolute',
+    top: -100,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(252, 211, 77, 0.2)',
+  },
+  decorCircle2: {
+    position: 'absolute',
+    bottom: -80,
+    left: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+  },
+
+  // Header
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginTop: 20,
+  },
+  logoContainer: {
+    marginBottom: 24,
+  },
+  logoGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Theme.colors.primary[500],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   appTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    fontSize: 36,
+    fontWeight: '800',
+    color: Theme.colors.primary[500],
+    marginBottom: 12,
+    letterSpacing: -1,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
@@ -145,41 +334,21 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 20,
   },
 
-  // Section des profils
-  profileSection: {
-    marginBottom: 48,
+  // Features
+  featuresSection: {
     gap: 16,
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  clientCard: {
-    borderColor: '#E0E7FF',
-    backgroundColor: '#FEFEFE',
-  },
-  driverCard: {
-    borderColor: '#D1FAE5',
-    backgroundColor: '#FEFEFE',
-  },
-  cardContent: {
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  iconContainer: {
+  featureIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 16,
@@ -187,52 +356,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 16,
   },
-  clientIcon: {
-    backgroundColor: '#EEF2FF',
-  },
-  driverIcon: {
-    backgroundColor: '#ECFDF5',
-  },
-  cardText: {
+  featureTextContainer: {
     flex: 1,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-    letterSpacing: -0.2,
-  },
-  cardDescription: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-
-  // Section des fonctionnalités
-  featuresSection: {
-    gap: 20,
-    paddingHorizontal: 8,
-  },
-  feature: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-  },
-  featureIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+    justifyContent: 'space-between',
   },
   featureText: {
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+    letterSpacing: -0.3,
+  },
+  featureBadge: {
+    backgroundColor: Theme.colors.primary[50],
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Theme.colors.primary[200],
+  },
+  featureBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primary[600],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // Button
+  buttonSection: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  startButton: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: Theme.colors.primary[500],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  startButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  bottomText: {
+    fontSize: 13,
     fontWeight: '500',
-    color: '#374151',
+    color: '#9CA3AF',
+    textAlign: 'center',
     letterSpacing: -0.1,
   },
 });

@@ -1,3 +1,8 @@
+export interface DeliveryResponse {
+  message: string;
+  payload: DeliveryRequest | DeliveryRequest[];
+}
+
 export interface DeliveryRequest {
   id: string;
   clientId: string;
@@ -7,15 +12,18 @@ export interface DeliveryRequest {
   destinationAddress: string;
   destinationLatitude: number;
   destinationLongitude: number;
-  description: string;
-  urgency: 'normal' | 'urgent';
+  description?: string;
+  urgency?: 'normal' | 'urgent';
   deliveryType: 'STANDARD' | 'EXPRESS';
   deliveryFee: number; // in FCFA, calculated by backend
-  status: 'pending' | 'accepted' | 'in_progress' | 'delivered' | 'cancelled';
+  status: 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'DELIVERED' | 'CANCELLED';
   createdAt: string;
+  updatedAt: string;
   estimatedDuration: number; // in minutes, calculated by backend
   distance: number; // in km, calculated by backend
-  livreurId?: string;
+  livreurId?: string | null;
+  orderId?: string | null;
+  paymentStatus: 'PENDING' | 'SUCCESSFUL' | 'FAILED' | 'CANCELLED';
 }
 
 export interface Driver {

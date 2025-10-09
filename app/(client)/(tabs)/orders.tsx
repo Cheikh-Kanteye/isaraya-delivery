@@ -69,11 +69,9 @@ export default function ClientOrdersScreen() {
       // Use the correct endpoint and DTO from API_ENDPOINTS.md
       const clientMissions = await deliveryService.getClientMissions();
       console.log('Fetched clientMissions:', clientMissions);
-      // Defensive check to ensure clientMissions is an array
-      if (Array.isArray(clientMissions)) {
-        setOrders(clientMissions);
+      if (clientMissions && Array.isArray(clientMissions.payload)) {
+        setOrders(clientMissions.payload);
       } else {
-        console.warn('clientMissions is not an array:', clientMissions);
         setOrders([]);
       }
     } catch (error) {
@@ -97,22 +95,64 @@ export default function ClientOrdersScreen() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'in_progress':
+    switch (status.toUpperCase()) {
+      case 'IN_PROGRESS':
         return Theme.colors.primary[500];
-      case 'delivered':
+      case 'DELIVERED':
         return Theme.colors.success[500];
+      case 'PENDING':
+        return Theme.colors.neutral[500];
+      case 'ACCEPTED':
+        return Theme.colors.accent[500];
+      case 'CANCELLED':
+        return Theme.colors.error[500];
       default:
         return Theme.colors.neutral[500];
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'in_progress':
+    switch (status.toUpperCase()) {
+      case 'IN_PROGRESS':
         return 'En cours';
-      case 'delivered':
+      case 'DELIVERED':
         return 'Livré';
+      case 'PENDING':
+        return 'En attente';
+      case 'ACCEPTED':
+        return 'Accepté';
+      case 'CANCELLED':
+        return 'Annulé';
+      default:
+        return status;
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'SUCCESSFUL':
+        return Theme.colors.success[500];
+      case 'PENDING':
+        return Theme.colors.warning[500];
+      case 'FAILED':
+        return Theme.colors.error[500];
+      case 'CANCELLED':
+        return Theme.colors.neutral[500];
+      default:
+        return Theme.colors.neutral[500];
+    }
+  };
+
+  const getPaymentStatusText = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'SUCCESSFUL':
+        return 'Payé';
+      case 'PENDING':
+        return 'Paiement en attente';
+      case 'FAILED':
+        return 'Paiement échoué';
+      case 'CANCELLED':
+        return 'Paiement annulé';
       default:
         return status;
     }
@@ -179,6 +219,26 @@ export default function ClientOrdersScreen() {
                     {formatDate(order.createdAt)}
                   </Text>
                 </View>
+                <View style={styles.paymentStatusContainer}>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor:
+                          getPaymentStatusColor(order.paymentStatus) + '20',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: getPaymentStatusColor(order.paymentStatus) },
+                      ]}
+                    >
+                      {getPaymentStatusText(order.paymentStatus)}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
 
@@ -200,13 +260,13 @@ export default function ClientOrdersScreen() {
                     />
                     <Text style={styles.ratingText}>4.5</Text>
                   </View>
-                  {order.status === 'in_progress' && (
+                  {order.status === 'IN_PROGRESS' && (
                     <Text style={styles.estimatedTime}>
                       Temps estimé: {order.estimatedDuration || '15 min'}
                     </Text>
                   )}
                 </View>
-                {order.status === 'in_progress' && (
+                {order.status === 'IN_PROGRESS' && (
                   <View style={styles.contactButtons}>
                     <TouchableOpacity style={styles.contactButton}>
                       <Phone
@@ -275,7 +335,7 @@ export default function ClientOrdersScreen() {
             </View>
 
             {/* Actions */}
-            {order.status === 'delivered' && (
+            {order.status === 'DELIVERED' && (
               <View style={styles.actionsSection}>
                 <TouchableOpacity style={styles.actionButton}>
                   <Text style={styles.actionButtonText}>Recommander</Text>
@@ -286,7 +346,7 @@ export default function ClientOrdersScreen() {
               </View>
             )}
 
-            {order.status === 'in_progress' && (
+            {order.status === 'IN_PROGRESS' && (
               <View style={styles.trackingSection}>
                 <TouchableOpacity style={styles.trackButton}>
                   <MapPin
@@ -374,6 +434,9 @@ const styles = StyleSheet.create({
   },
   orderTime: {
     ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+  },
+  paymentStatusContainer: {
+    marginTop: Theme.spacing.sm,
   },
   driverSection: {
     flexDirection: 'row',

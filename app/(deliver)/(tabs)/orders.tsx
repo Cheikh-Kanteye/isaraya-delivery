@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,80 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Filter, Package } from 'lucide-react-native';
 import { Theme, createTextStyle } from '@/constants/theme';
-import { orders as ConstantOrders } from '@/constants/orders';
+import { deliveryService } from '@/services/deliveryService';
+import { DeliveryRequest } from '@/types/client';
+import { Order } from '@/types/orders';
 import OrderCard from '@/components/orders/OrderCard';
-// No direct use of useAuth or authService in this file, but keeping the import style consistent
-// import { useAuth } from '@/contexts/AuthContext';
-// import { authService } from '@/services/authService';
 
 const Orders = () => {
   const [selectedFilter, setSelectedFilter] = useState<
     'all' | 'available' | 'active'
   >('all');
 
-  const [orders, setOrders] = useState(ConstantOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const pendingResponse = await deliveryService.getPendingMissions();
+        const assignedResponse = await deliveryService.getDelivererMissions();
+
+        const pendingPayload = pendingResponse.payload;
+        const pendingMissions = Array.isArray(pendingPayload)
+          ? pendingPayload
+          : pendingPayload
+          ? [pendingPayload]
+          : [];
+        const assignedPayload = assignedResponse.payload;
+        const assignedMissions = Array.isArray(assignedPayload)
+          ? assignedPayload
+          : assignedPayload
+          ? [assignedPayload]
+          : [];
+
+        const mapMissionToOrder = (mission: DeliveryRequest): Order => {
+          let status: Order['status'] = 'available';
+          const missionStatus = mission.status as string;
+          if (missionStatus === 'PENDING' || missionStatus === 'ASSIGNED')
+            status = 'available'; // Can accept/refuse
+          else if (missionStatus === 'ACCEPTED') status = 'accepted';
+          else if (missionStatus === 'IN_PROGRESS') status = 'picked_up';
+          else if (missionStatus === 'DELIVERED') status = 'delivered';
+          else if (missionStatus === 'CANCELLED') status = 'rejected';
+
+          return {
+            id: mission.id,
+            restaurant: mission.pickupAddress,
+            customer: 'Client', // Placeholder, as API doesn't provide customer name
+            address: mission.destinationAddress,
+            items: 1, // Placeholder
+            distance: mission.distance ? `${mission.distance} km` : 'N/A',
+            time: mission.estimatedDuration
+              ? `${mission.estimatedDuration} min`
+              : 'N/A',
+            earnings: mission.deliveryFee,
+            status,
+            urgent: mission.urgency === 'urgent',
+            lat: mission.pickupLatitude,
+            lng: mission.pickupLongitude,
+          };
+        };
+
+        const pendingOrders = pendingMissions.map(mapMissionToOrder);
+        const assignedOrders = assignedMissions.map(mapMissionToOrder);
+
+        setOrders([...pendingOrders, ...assignedOrders]);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        // Handle error, maybe show a message
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const filteredOrders = orders.filter((order) => {
     if (selectedFilter === 'available') return order.status === 'available';
@@ -136,27 +198,35 @@ const Orders = () => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {filteredOrders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            onAccept={handleAcceptOrder}
-            onDecline={handleDeclineOrder}
-            onCall={handleCall}
-            onMessage={handleMessage}
-            onNavigate={handleNavigate}
-          />
-        ))}
-        {filteredOrders.length === 0 && (
-          <View style={styles.emptyState}>
-            <Package size={48} color={Theme.colors.neutral[300]} />
-            <Text style={styles.emptyStateTitle}>Aucune commande</Text>
-            <Text style={styles.emptyStateText}>
-              {selectedFilter === 'available'
-                ? 'Aucune commande disponible pour le moment'
-                : 'Aucune commande en cours'}
-            </Text>
+        {loading ? (
+          <View style={styles.loadingState}>
+            <Text style={styles.loadingText}>Chargement des commandes...</Text>
           </View>
+        ) : (
+          <>
+            {filteredOrders.map((order, index) => (
+              <OrderCard
+                key={`${order.id}-${index}`}
+                order={order}
+                onAccept={handleAcceptOrder}
+                onDecline={handleDeclineOrder}
+                onCall={handleCall}
+                onMessage={handleMessage}
+                onNavigate={handleNavigate}
+              />
+            ))}
+            {filteredOrders.length === 0 && (
+              <View style={styles.emptyState}>
+                <Package size={48} color={Theme.colors.neutral[300]} />
+                <Text style={styles.emptyStateTitle}>Aucune commande</Text>
+                <Text style={styles.emptyStateText}>
+                  {selectedFilter === 'available'
+                    ? 'Aucune commande disponible pour le moment'
+                    : 'Aucune commande en cours'}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -231,6 +301,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: Theme.spacing['3xl'],
   },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    ...createTextStyle('base', 'normal', Theme.colors.neutral[600]),
+  },
 });
-
-

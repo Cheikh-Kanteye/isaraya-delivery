@@ -201,50 +201,6 @@ export default function HomeScreen() {
             <Text style={styles.navigateText}>Voir la carte</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Performance Card */}
-        <View style={styles.performanceCard}>
-          <View style={styles.performanceHeader}>
-            <TrendingUp
-              size={Theme.layout.iconSize.sm}
-              color={Theme.colors.primary[500]}
-            />
-            <Text style={styles.performanceTitle}>Performance</Text>
-          </View>
-
-          <View style={styles.performanceStats}>
-            <View style={styles.performanceStat}>
-              <Text style={styles.performanceValue}>95%</Text>
-              <Text style={styles.performanceLabel}>
-                Taux d&apos;acceptation
-              </Text>
-            </View>
-            <View style={styles.performanceStat}>
-              <Text style={styles.performanceValue}>18 min</Text>
-              <Text style={styles.performanceLabel}>Temps moyen</Text>
-            </View>
-            <View style={styles.performanceStat}>
-              <Text style={styles.performanceValue}>
-                {deliver?.totalDeliveries || '342'}
-              </Text>
-              <Text style={styles.performanceLabel}>Livraisons totales</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Weekly Goal */}
-        <View style={styles.goalCard}>
-          <Text style={styles.goalTitle}>Objectif Hebdomadaire</Text>
-          <Text style={styles.goalProgress}>47/60 livraisons</Text>
-
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '78%' }]} />
-          </View>
-
-          <Text style={styles.goalText}>
-            Plus que 13 livraisons pour atteindre votre objectif !
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

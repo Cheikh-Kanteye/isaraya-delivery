@@ -5,14 +5,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Types for payment endpoints
 interface InitiatePaymentDto {
   orderId: string;
-  amount: number;
+  item_price: number;
+  command_name: string;
   currency: string;
-  description: string;
-  customer: {
-    name: string;
-    email: string;
-    phone: string;
+  target_payment: string;
+  custom_field: object;
+  user: {
+    phone_number: string;
+    first_name: string;
+    last_name: string;
   };
+  origin: string;
 }
 
 interface PaymentStatus {
@@ -44,7 +47,7 @@ export const paymentService = {
 
   async initiatePayment(
     paymentData: InitiatePaymentDto
-  ): Promise<{ redirectUrl: string; token: string }> {
+  ): Promise<{ redirectUrl: string; token?: string }> {
     try {
       const headers = await this.getHeaders();
 
@@ -68,7 +71,7 @@ export const paymentService = {
       }
 
       const result = await response.json();
-      return result.payload?.data || result.data || result;
+      return result.payload || result;
     } catch (error) {
       console.error('Erreur dans initiatePayment:', error);
       throw error;
