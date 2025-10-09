@@ -52,7 +52,7 @@ export default function ClientHomeScreenImproved() {
 
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => router.push('/(client)/(tabs)/search')}
+              onPress={() => router.push('/(client)/(tabs)/create-delivery')}
               activeOpacity={0.9}
             >
               <Zap size={24} color={Theme.colors.white} strokeWidth={2.5} />
@@ -70,7 +70,7 @@ export default function ClientHomeScreenImproved() {
             <TouchableOpacity
               style={[styles.quickActionCard, styles.expressCard]}
               onPress={() =>
-                router.push('/(client)/(tabs)/search?type=express')
+                router.push('/(client)/(tabs)/create-delivery?urgency=HIGH')
               }
               activeOpacity={0.8}
             >
@@ -98,7 +98,7 @@ export default function ClientHomeScreenImproved() {
             <TouchableOpacity
               style={[styles.quickActionCard, styles.standardCard]}
               onPress={() =>
-                router.push('/(client)/(tabs)/search?type=standard')
+                router.push('/(client)/(tabs)/create-delivery?urgency=MEDIUM')
               }
               activeOpacity={0.8}
             >
@@ -125,7 +125,7 @@ export default function ClientHomeScreenImproved() {
           <TouchableOpacity
             style={styles.scheduleOption}
             onPress={() =>
-              router.push('/(client)/(tabs)/search?type=scheduled')
+              router.push('/(client)/(tabs)/create-delivery?urgency=LOW')
             }
             activeOpacity={0.8}
           >
