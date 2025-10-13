@@ -87,7 +87,6 @@ export default function ClientOrdersScreen() {
 
       // Use the correct endpoint and DTO from API_ENDPOINTS.md
       const clientMissions = await deliveryService.getClientMissions();
-      console.log('Client missions:', clientMissions);
       
       // Gérer le cas où payload est null, undefined, ou un tableau
       if (clientMissions?.payload && Array.isArray(clientMissions.payload)) {

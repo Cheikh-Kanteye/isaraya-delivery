@@ -65,7 +65,6 @@ export default function OrderTrackingScreen() {
 
       console.log('Fetching mission with ID:', missionId);
       const response = await deliveryService.getMissionById(missionId);
-      console.log('Mission data received:', response);
       
       if (response?.payload) {
         setMission(response.payload);

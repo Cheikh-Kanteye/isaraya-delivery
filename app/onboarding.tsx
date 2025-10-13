@@ -40,11 +40,8 @@ export default function WelcomeScreenModern() {
 
   useEffect(() => {
     // Redirect authenticated users
-    console.log('isAuthenticated', isAuthenticated);
-    console.log('entity', entity);
-    if (isAuthenticated && entity) {
-      console.log('entity.role:', entity.role);
-      console.log('entity.roles:', entity.roles);
+    console.log('isAuthenticated', isAuthenticated); 
+    if (isAuthenticated && entity) { 
       
       // Handle both old and new role formats
       let userRole = entity.role;
@@ -53,8 +50,7 @@ export default function WelcomeScreenModern() {
         // Ensure the role is one of the valid types
         if (extractedRole === 'client' || extractedRole === 'deliver' || extractedRole === 'admin') {
           userRole = extractedRole as 'client' | 'deliver' | 'admin';
-        }
-        console.log('Extracted role from roles array:', userRole);
+        } 
       }
       
       if (userRole === 'client') {
