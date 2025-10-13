@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
+  Alert,
+  Linking,
 } from 'react-native';
 import {
   MapPin,
@@ -143,11 +145,21 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </TouchableOpacity>
           </View>
         )}
-        {order.status === 'accepted' && (
+        {(order.status === 'accepted' || order.status === 'picked_up') && (
           <View style={styles.activeActions}>
             <TouchableOpacity
               style={styles.contactButton}
-              onPress={() => onCall?.(order.id)}
+              onPress={() => {
+                if (order.phone) {
+                  Linking.openURL(`tel:${order.phone}`);
+                } else {
+                  Alert.alert(
+                    'Appel client',
+                    'Le numéro de téléphone du client n\'est pas disponible.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }}
             >
               <Phone
                 size={Theme.layout.iconSize.xs}
@@ -157,7 +169,13 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.contactButton}
-              onPress={() => onMessage?.(order.id)}
+              onPress={() => {
+                Alert.alert(
+                  'Message client',
+                  'Les informations de contact du client ne sont pas disponibles pour le moment.',
+                  [{ text: 'OK' }]
+                );
+              }}
             >
               <MessageCircle
                 size={Theme.layout.iconSize.xs}

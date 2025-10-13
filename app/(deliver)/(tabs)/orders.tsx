@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Filter, Package } from 'lucide-react-native';
@@ -13,8 +14,11 @@ import { deliveryService } from '@/services/deliveryService';
 import { DeliveryRequest } from '@/types/client';
 import { Order } from '@/types/orders';
 import OrderCard from '@/components/orders/OrderCard';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 const Orders = () => {
+  const router = useRouter();
   const [selectedFilter, setSelectedFilter] = useState<
     'all' | 'available' | 'active'
   >('all');
@@ -22,33 +26,43 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
+  const fetchOrders = async () => {
       try {
         const pendingResponse = await deliveryService.getPendingMissions();
         const assignedResponse = await deliveryService.getDelivererMissions();
 
-        const pendingPayload = pendingResponse.payload;
-        const pendingMissions = Array.isArray(pendingPayload)
-          ? pendingPayload
-          : pendingPayload
-          ? [pendingPayload]
+        // Gérer le cas où payload est null ou undefined
+        const pendingMissions = Array.isArray(pendingResponse.payload)
+          ? pendingResponse.payload
           : [];
-        const assignedPayload = assignedResponse.payload;
-        const assignedMissions = Array.isArray(assignedPayload)
-          ? assignedPayload
-          : assignedPayload
-          ? [assignedPayload]
+        const assignedMissions = Array.isArray(assignedResponse.payload)
+          ? assignedResponse.payload
           : [];
 
         const mapMissionToOrder = (mission: DeliveryRequest): Order => {
           let status: Order['status'] = 'available';
           const missionStatus = mission.status as string;
-          if (missionStatus === 'PENDING' || missionStatus === 'ASSIGNED')
-            status = 'available'; // Can accept/refuse
-          else if (missionStatus === 'ACCEPTED') status = 'accepted';
-          else if (missionStatus === 'IN_PROGRESS') status = 'picked_up';
-          else if (missionStatus === 'DELIVERED') status = 'delivered';
+          
+          // PENDING = disponible pour tous les livreurs
+          if (missionStatus === 'PENDING') {
+            status = 'available';
+          }
+          // ASSIGNED = assigné à CE livreur (déjà accepté)
+          else if (missionStatus === 'ASSIGNED') {
+            status = 'accepted';
+          }
+          // ACCEPTED = accepté par CE livreur
+          else if (missionStatus === 'ACCEPTED') {
+            status = 'accepted';
+          }
+          // IN_PROGRESS = en cours de livraison
+          else if (missionStatus === 'IN_PROGRESS') {
+            status = 'picked_up';
+          }
+          // DELIVERED = livré
+          else if (missionStatus === 'DELIVERED') {
+            status = 'delivered';
+          }
 
           return {
             id: mission.id,
@@ -68,6 +82,8 @@ const Orders = () => {
           };
         };
 
+
+
         const pendingOrders = pendingMissions.map(mapMissionToOrder);
         const assignedOrders = assignedMissions.map(mapMissionToOrder);
 
@@ -80,9 +96,21 @@ const Orders = () => {
       }
     };
 
+  useEffect(() => {
     fetchOrders();
-    console.log('Orders fetched', JSON.stringify(orders, null, 2));
+    
+    // Refresh automatique toutes les 30 secondes
+    const interval = setInterval(fetchOrders, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
+
+  // Rafraîchir les données quand l'écran devient actif
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
 
   const filteredOrders = orders.filter((order) => {
     if (selectedFilter === 'available') return order.status === 'available';
@@ -91,34 +119,73 @@ const Orders = () => {
     return true;
   });
 
-  const handleAcceptOrder = (orderId: string) => {
-    console.log('Accept order:', orderId);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        return order.id === orderId ? { ...order, status: 'accepted' } : order;
-      })
-    );
+  const handleAcceptOrder = async (orderId: string) => {
+    try {
+      console.log('Accept order:', orderId);
+      
+      // Appeler l'API pour accepter la mission
+      await deliveryService.acceptMission({
+        missionId: orderId,
+        livreurId: 'current-user-id', // TODO: Récupérer l'ID du livreur depuis le contexte auth
+      });
+      
+      // Mettre à jour l'état local
+      setOrders((prevOrders) =>
+        prevOrders.map((order) => {
+          return order.id === orderId ? { ...order, status: 'accepted' } : order;
+        })
+      );
+      
+      // Rafraîchir la liste des commandes
+      fetchOrders();
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      Alert.alert('Erreur', 'Impossible d\'accepter la commande');
+    }
   };
 
   const handleDeclineOrder = (orderId: string) => {
-    console.log('Decline order:', orderId);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        return order.id === orderId ? { ...order, status: 'rejected' } : order;
-      })
+    Alert.alert(
+      'Refuser la commande',
+      'Êtes-vous sûr de vouloir refuser cette commande ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Refuser',
+          style: 'destructive',
+          onPress: () => {
+            setOrders((prevOrders) =>
+              prevOrders.map((order) => {
+                return order.id === orderId ? { ...order, status: 'rejected' } : order;
+              })
+            );
+            // Rafraîchir la liste des commandes
+            fetchOrders();
+          },
+        },
+      ]
     );
   };
 
   const handleCall = (orderId: string) => {
-    console.log('Call customer:', orderId);
+    Alert.alert(
+      'Appel client',
+      'Les informations de contact du client ne sont pas disponibles pour le moment.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleMessage = (orderId: string) => {
-    console.log('Message customer:', orderId);
+    Alert.alert(
+      'Message client',
+      'Les informations de contact du client ne sont pas disponibles pour le moment.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleNavigate = (orderId: string) => {
     console.log('Navigate to:', orderId);
+    router.push(`/(deliver)/navigation/${orderId}` as any);
   };
 
   return (

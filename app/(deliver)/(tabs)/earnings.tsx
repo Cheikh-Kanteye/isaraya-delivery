@@ -1,76 +1,128 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
+  Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   DollarSign,
-  TrendingUp,
   Calendar,
-  Clock,
-  Target,
-  Award,
   CreditCard,
   Eye,
-  ChevronRight
+  ChevronRight,
+  TrendingUp,
+  Package,
+  Clock,
 } from 'lucide-react-native';
-import { Theme, createCardStyle, createTextStyle, createButtonStyle } from '@/constants/theme';
-// No direct use of useAuth or authService in this file, but keeping the import style consistent
-// import { useAuth } from '@/contexts/AuthContext';
-// import { authService } from '@/services/authService';
+import { Theme, createTextStyle } from '@/constants/theme';
+import { deliveryService, DelivererStats } from '@/services/deliveryService';
 
 export default function EarningsScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [stats, setStats] = useState<DelivererStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const statsData = await deliveryService.getDelivererStats();
+        setStats(statsData.payload);
+      } catch (error) {
+        console.error('Error fetching earnings:', error);
+        Alert.alert('Erreur', 'Impossible de charger les statistiques');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   // Helper function to format CFA currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount) + ' FCFA';
+  const formatCurrency = (amount: number | undefined | null) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '0 FCFA';
+    }
+    return (
+      new Intl.NumberFormat('fr-FR', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount) + ' FCFA'
+    );
   };
 
-  const earningsData = {
-    day: {
-      total: 83000,
-      deliveries: 12,
-      hours: '6h 45m',
-      average: 6900,
-    },
-    week: {
-      total: 548100,
-      deliveries: 78,
-      hours: '42h 30m',
-      average: 7030,
-    },
-    month: {
-      total: 2111070,
-      deliveries: 298,
-      hours: '165h 20m',
-      average: 7080,
-    },
+  // Calculer les données selon la période sélectionnée
+  const getCurrentData = () => {
+    if (!stats) {
+      return {
+        total: 0,
+        deliveries: 0,
+        hours: '0h 0m',
+        average: 0,
+      };
+    }
+
+    switch (selectedPeriod) {
+      case 'day':
+        return {
+          total: stats.recent?.[0]?.amount || 0,
+          deliveries: stats.recent?.[0]?.deliveries || 0,
+          hours: stats.recent?.[0]?.hours || '0h 0m',
+          average: stats.average || 0,
+        };
+      case 'week':
+        return {
+          total: stats.total || 0,
+          deliveries: stats.deliveries || 0,
+          hours: stats.hours || '0h 0m',
+          average: stats.average || 0,
+        };
+      case 'month':
+        // Pour le mois, on peut estimer en multipliant par 4 les données hebdomadaires
+        return {
+          total: (stats.total || 0) * 4,
+          deliveries: (stats.deliveries || 0) * 4,
+          hours: '0h 0m', // Calculer si nécessaire
+          average: stats.average || 0,
+        };
+      default:
+        return {
+          total: 0,
+          deliveries: 0,
+          hours: '0h 0m',
+          average: 0,
+        };
+    }
   };
 
-  const currentData = earningsData[selectedPeriod];
+  const currentData = getCurrentData();
 
-  const recentEarnings = [
-    { id: '1', date: '2024-01-15', amount: 83000, deliveries: 12, hours: '6h 45m' },
-    { id: '2', date: '2024-01-14', amount: 64200, deliveries: 9, hours: '5h 30m' },
-    { id: '3', date: '2024-01-13', amount: 101600, deliveries: 14, hours: '8h 15m' },
-    { id: '4', date: '2024-01-12', amount: 73000, deliveries: 11, hours: '6h 20m' },
-    { id: '5', date: '2024-01-11', amount: 58100, deliveries: 8, hours: '4h 45m' },
-  ];
-
-  const weeklyGoal = {
-    current: 548100,
-    target: 650000,
-    percentage: 84.3,
-  };
+  const recentEarnings = stats?.recent || [];
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -83,165 +135,243 @@ export default function EarningsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Gains</Text>
-        <TouchableOpacity style={styles.paymentButton}>
-          <CreditCard size={Theme.layout.iconSize.sm} color={Theme.colors.primary[500]} />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'day' && styles.activePeriodButton]}
-            onPress={() => setSelectedPeriod('day')}
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Animated.View
+            style={[
+              styles.heroContent,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
           >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'day' && styles.activePeriodButtonText]}>
-              Jour
-            </Text>
-          </TouchableOpacity>
+            <Text style={styles.headerTitle}>Gains</Text>
+            <TouchableOpacity style={styles.paymentButton}>
+              <CreditCard
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+          </Animated.View>
 
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'week' && styles.activePeriodButton]}
-            onPress={() => setSelectedPeriod('week')}
-          >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'week' && styles.activePeriodButtonText]}>
-              Semaine
-            </Text>
-          </TouchableOpacity>
+          {/* Period Selector */}
+          <View style={styles.periodSelector}>
+            <TouchableOpacity
+              style={[
+                styles.periodButton,
+                selectedPeriod === 'day' && styles.activePeriodButton,
+              ]}
+              onPress={() => setSelectedPeriod('day')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'day' && styles.activePeriodButtonText,
+                ]}
+              >
+                Jour
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'month' && styles.activePeriodButton]}
-            onPress={() => setSelectedPeriod('month')}
-          >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'month' && styles.activePeriodButtonText]}>
-              Mois
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.periodButton,
+                selectedPeriod === 'week' && styles.activePeriodButton,
+              ]}
+              onPress={() => setSelectedPeriod('week')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'week' && styles.activePeriodButtonText,
+                ]}
+              >
+                Semaine
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.periodButton,
+                selectedPeriod === 'month' && styles.activePeriodButton,
+              ]}
+              onPress={() => setSelectedPeriod('month')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'month' && styles.activePeriodButtonText,
+                ]}
+              >
+                Mois
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Main Earnings Card */}
-        <View style={styles.mainEarningsCard}>
-          <View style={styles.earningsHeader}>
-            <DollarSign size={Theme.layout.iconSize.md} color={Theme.colors.primary[500]} />
-            <Text style={styles.earningsTitle}>Gains totaux</Text>
+        <Animated.View
+          style={[
+            styles.earningsContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.mainEarningsCard}>
+            <View style={styles.earningsHeader}>
+              <DollarSign
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.earningsTitle}>Total</Text>
+            </View>
+
+            <Text style={styles.earningsAmount} numberOfLines={1} adjustsFontSizeToFit>
+              {loading ? '...' : formatCurrency(currentData.total)}
+            </Text>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <Package
+                  size={Theme.layout.iconSize.md}
+                  color={Theme.colors.accent[500]}
+                  strokeWidth={2}
+                />
+                <Text style={styles.statValue}>{loading ? '...' : currentData.deliveries}</Text>
+                <Text style={styles.statLabel}>Livraisons</Text>
+              </View>
+
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <Clock
+                  size={Theme.layout.iconSize.md}
+                  color={Theme.colors.secondary[500]}
+                  strokeWidth={2}
+                />
+                <Text style={styles.statValue}>{loading ? '...' : currentData.hours}</Text>
+                <Text style={styles.statLabel}>Temps actif</Text>
+              </View>
+
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <TrendingUp
+                  size={Theme.layout.iconSize.md}
+                  color={Theme.colors.success[500]}
+                  strokeWidth={2}
+                />
+                <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {loading ? '...' : formatCurrency(currentData.average)}
+                </Text>
+                <Text style={styles.statLabel}>Par livraison</Text>
+              </View>
+            </View>
           </View>
-
-          <Text style={styles.earningsAmount}>{formatCurrency(currentData.total)}</Text>
-
-          <View style={styles.earningsStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{currentData.deliveries}</Text>
-              <Text style={styles.statLabel}>Livraisons</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{currentData.hours}</Text>
-              <Text style={styles.statLabel}>Temps actif</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{formatCurrency(currentData.average)}</Text>
-              <Text style={styles.statLabel}>Par livraison</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Weekly Goal */}
-        <View style={styles.goalCard}>
-          <View style={styles.goalHeader}>
-            <Target size={Theme.layout.iconSize.sm} color={Theme.colors.secondary[500]} />
-            <Text style={styles.goalTitle}>Objectif Hebdomadaire</Text>
-          </View>
-
-          <View style={styles.goalProgress}>
-            <View style={styles.goalAmounts}>
-              <Text style={styles.goalCurrent}>{formatCurrency(weeklyGoal.current)}</Text>
-              <Text style={styles.goalTarget}>/ {formatCurrency(weeklyGoal.target)}</Text>
-            </View>
-
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${weeklyGoal.percentage}%` }]} />
-            </View>
-
-            <Text style={styles.goalPercentage}>{weeklyGoal.percentage}% atteint</Text>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionCard}>
-            <View style={styles.actionIcon}>
-              <TrendingUp size={Theme.layout.iconSize.sm} color={Theme.colors.primary[500]} />
-            </View>
-            <Text style={styles.actionTitle}>Statistiques</Text>
-            <Text style={styles.actionSubtitle}>Voir les détails</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionCard}>
-            <View style={styles.actionIcon}>
-              <Award size={Theme.layout.iconSize.sm} color={Theme.colors.accent[500]} />
-            </View>
-            <Text style={styles.actionTitle}>Bonus</Text>
-            <Text style={styles.actionSubtitle}>Voir les bonus</Text>
-          </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {/* Recent Earnings */}
-        <View style={styles.recentEarningsCard}>
-          <View style={styles.recentHeader}>
-            <Text style={styles.recentTitle}>Historique récent</Text>
-            <TouchableOpacity style={styles.viewAllButton}>
-              <Eye size={Theme.layout.iconSize.xs} color={Theme.colors.primary[500]} />
-              <Text style={styles.viewAllText}>Voir tout</Text>
-            </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Historique récent</Text>
+          <View style={styles.recentEarningsCard}>
+            <View style={styles.recentHeader}>
+              <TouchableOpacity style={styles.viewAllButton} activeOpacity={0.7}>
+                <Eye
+                  size={Theme.layout.iconSize.xs}
+                  color={Theme.colors.primary[500]}
+                  strokeWidth={2}
+                />
+                <Text style={styles.viewAllText}>Voir tout</Text>
+              </TouchableOpacity>
+            </View>
+
+            {recentEarnings.map((earning, index) => (
+              <TouchableOpacity
+                key={earning.id}
+                style={[
+                  styles.earningItem,
+                  index === recentEarnings.length - 1 && styles.earningItemLast,
+                ]}
+                activeOpacity={0.7}
+              >
+                <View style={styles.earningLeft}>
+                  <Calendar
+                    size={Theme.layout.iconSize.sm}
+                    color={Theme.colors.neutral[500]}
+                    strokeWidth={2}
+                  />
+                  <View style={styles.earningInfo}>
+                    <Text style={styles.earningDateText}>
+                      {formatDate(earning.date)}
+                    </Text>
+                    <Text style={styles.earningDetails}>
+                      {earning.deliveries} livraisons · {earning.hours}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.earningRight}>
+                  <Text style={styles.earningAmount} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatCurrency(earning.amount)}
+                  </Text>
+                  <ChevronRight
+                    size={Theme.layout.iconSize.sm}
+                    color={Theme.colors.neutral[300]}
+                    strokeWidth={2}
+                  />
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
-
-          {recentEarnings.map((earning) => (
-            <TouchableOpacity key={earning.id} style={styles.earningItem}>
-              <View style={styles.earningDate}>
-                <Calendar size={Theme.layout.iconSize.xs} color={Theme.colors.neutral[500]} />
-                <Text style={styles.earningDateText}>{formatDate(earning.date)}</Text>
-              </View>
-
-              <View style={styles.earningDetails}>
-                <Text style={styles.earningAmount}>{formatCurrency(earning.amount)}</Text>
-                <Text style={styles.earningInfo}>
-                  {earning.deliveries} livraisons · {earning.hours}
-                </Text>
-              </View>
-
-              <ChevronRight size={Theme.layout.iconSize.xs} color={Theme.colors.neutral[300]} />
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* Payment Info */}
-        <View style={styles.paymentInfoCard}>
-          <View style={styles.paymentHeader}>
-            <CreditCard size={Theme.layout.iconSize.sm} color={Theme.colors.neutral[500]} />
-            <Text style={styles.paymentTitle}>Prochain paiement</Text>
-          </View>
-
-          <Text style={styles.paymentDate}>Vendredi 19 janvier</Text>
-          <Text style={styles.paymentAmount}>{formatCurrency(548100)}</Text>
-
-          <View style={styles.paymentDetails}>
-            <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Gains de la semaine</Text>
-              <Text style={styles.paymentValue}>{formatCurrency(548100)}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Prochain paiement</Text>
+          <View style={styles.paymentInfoCard}>
+            <View style={styles.paymentHeader}>
+              <View style={styles.paymentDateContainer}>
+                <Text style={styles.paymentDate}>Prochain paiement</Text>
+                <Text style={styles.paymentAmount} numberOfLines={1} adjustsFontSizeToFit>
+                  {loading ? '...' : formatCurrency(stats?.total || 0)}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Frais de service</Text>
-              <Text style={styles.paymentValue}>-{formatCurrency(27400)}</Text>
-            </View>
+            <View style={styles.paymentDivider} />
 
-            <View style={[styles.paymentRow, styles.paymentTotal]}>
-              <Text style={styles.paymentTotalLabel}>Net à recevoir</Text>
-              <Text style={styles.paymentTotalValue}>{formatCurrency(520700)}</Text>
+            <View style={styles.paymentDetails}>
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Gains de la semaine</Text>
+                <Text style={styles.paymentValue}>
+                  {loading ? '...' : formatCurrency(stats?.total || 0)}
+                </Text>
+              </View>
+
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Frais de service (5%)</Text>
+                <Text style={styles.paymentValue}>
+                  -{loading ? '...' : formatCurrency(Math.round((stats?.total || 0) * 0.05))}
+                </Text>
+              </View>
+
+              <View style={styles.paymentDivider} />
+
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentTotalLabel}>Net à recevoir</Text>
+                <Text style={styles.paymentTotalValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {loading ? '...' : formatCurrency(Math.round((stats?.total || 0) * 0.95))}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -255,56 +385,68 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Theme.colors.neutral[50],
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.neutral[200],
-  },
-  headerTitle: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.neutral[900]),
-  },
-  paymentButton: {
-    padding: Theme.spacing.sm,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.md,
-  },
   scrollView: {
     flex: 1,
   },
+
+  // Hero Section
+  heroSection: {
+    paddingTop: Theme.spacing.xl,
+    paddingBottom: Theme.spacing['4xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
+    backgroundColor: Theme.colors.primary[50],
+  },
+  heroContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing['2xl'],
+  },
+  headerTitle: {
+    ...createTextStyle('3xl', 'bold', Theme.colors.neutral[900]),
+    letterSpacing: -0.5,
+  },
+  paymentButton: {
+    padding: Theme.spacing.md,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.full,
+  },
+
+  // Period Selector
   periodSelector: {
     flexDirection: 'row',
     backgroundColor: Theme.colors.white,
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
     padding: 4,
-    borderRadius: Theme.borderRadius.lg,
-    ...Theme.shadows.sm,
+    borderRadius: Theme.borderRadius.xl,
+    gap: 4,
   },
   periodButton: {
     flex: 1,
-    paddingVertical: Theme.spacing.sm,
-    paddingHorizontal: Theme.spacing.md,
-    borderRadius: Theme.borderRadius.md,
+    paddingVertical: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.sm,
+    borderRadius: Theme.borderRadius.lg,
     alignItems: 'center',
   },
   activePeriodButton: {
     backgroundColor: Theme.colors.primary[500],
   },
   periodButtonText: {
-    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'semibold', Theme.colors.neutral[500]),
   },
   activePeriodButtonText: {
     color: Theme.colors.white,
   },
+
+  // Main Earnings Card
+  earningsContainer: {
+    marginTop: -30,
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['3xl'],
+  },
   mainEarningsCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
   earningsHeader: {
     flexDirection: 'row',
@@ -318,103 +460,54 @@ const styles = StyleSheet.create({
   earningsAmount: {
     ...createTextStyle('4xl', 'bold', Theme.colors.primary[500]),
     marginBottom: Theme.spacing.xl,
+    flexShrink: 1,
   },
-  earningsStats: {
+  statsGrid: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: Theme.colors.neutral[200],
   },
   statValue: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+    ...createTextStyle('lg', 'bold', Theme.colors.neutral[900]),
+    marginTop: Theme.spacing.sm,
     marginBottom: Theme.spacing.xs,
+    flexShrink: 1,
   },
   statLabel: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('xs', 'medium', Theme.colors.neutral[500]),
+    textAlign: 'center',
   },
-  goalCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+
+  // Section
+  section: {
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['2xl'],
   },
-  goalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.lg,
-  },
-  goalTitle: {
+  sectionTitle: {
     ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+    marginBottom: Theme.spacing.md,
   },
-  goalProgress: {
-    gap: Theme.spacing.sm,
-  },
-  goalAmounts: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Theme.spacing.xs,
-  },
-  goalCurrent: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.secondary[500]),
-  },
-  goalTarget: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[500]),
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Theme.colors.neutral[200],
-    borderRadius: Theme.borderRadius.sm,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Theme.colors.secondary[500],
-    borderRadius: Theme.borderRadius.sm,
-  },
-  goalPercentage: {
-    ...createTextStyle('sm', 'medium', Theme.colors.secondary[500]),
-    textAlign: 'right',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: Theme.spacing.md,
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-  },
-  actionCard: {
-    ...createCardStyle('sm'),
-    flex: 1,
-    alignItems: 'center',
-  },
-  actionIcon: {
-    width: Theme.layout.iconSize.xl,
-    height: Theme.layout.iconSize.xl,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Theme.spacing.sm,
-  },
-  actionTitle: {
-    ...createTextStyle('sm', 'semibold', Theme.colors.neutral[900]),
-    marginBottom: 2,
-  },
-  actionSubtitle: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
-  },
+
+  // Recent Earnings Card
   recentEarningsCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
   recentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: Theme.spacing.lg,
-  },
-  recentTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+    marginBottom: Theme.spacing.md,
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -422,59 +515,71 @@ const styles = StyleSheet.create({
     gap: Theme.spacing.xs,
   },
   viewAllText: {
-    ...createTextStyle('sm', 'medium', Theme.colors.primary[500]),
+    ...createTextStyle('sm', 'semibold', Theme.colors.primary[500]),
   },
   earningItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Theme.spacing.md,
+    justifyContent: 'space-between',
+    paddingVertical: Theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Theme.colors.neutral[100],
   },
-  earningDate: {
+  earningItemLast: {
+    borderBottomWidth: 0,
+  },
+  earningLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Theme.spacing.sm,
-    width: 120,
-  },
-  earningDateText: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
-  },
-  earningDetails: {
+    gap: Theme.spacing.md,
     flex: 1,
   },
-  earningAmount: {
+  earningInfo: {
+    flex: 1,
+  },
+  earningDateText: {
     ...createTextStyle('base', 'semibold', Theme.colors.neutral[900]),
     marginBottom: 2,
   },
-  earningInfo: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
+  earningDetails: {
+    ...createTextStyle('xs', 'medium', Theme.colors.neutral[500]),
   },
-  paymentInfoCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-    marginBottom: Theme.spacing.xl,
-  },
-  paymentHeader: {
+  earningRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Theme.spacing.sm,
+  },
+  earningAmount: {
+    ...createTextStyle('base', 'bold', Theme.colors.primary[500]),
+    flexShrink: 1,
+  },
+
+  // Payment Info Card
+  paymentInfoCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+  },
+  paymentHeader: {
     marginBottom: Theme.spacing.lg,
   },
-  paymentTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+  paymentDateContainer: {
+    gap: Theme.spacing.xs,
   },
   paymentDate: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
-    marginBottom: Theme.spacing.xs,
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
   },
   paymentAmount: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.primary[500]),
-    marginBottom: Theme.spacing.lg,
+    ...createTextStyle('3xl', 'bold', Theme.colors.primary[500]),
+    flexShrink: 1,
+  },
+  paymentDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.neutral[200],
+    marginVertical: Theme.spacing.lg,
   },
   paymentDetails: {
-    gap: Theme.spacing.sm,
+    gap: Theme.spacing.md,
   },
   paymentRow: {
     flexDirection: 'row',
@@ -482,22 +587,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   paymentLabel: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    flex: 1,
   },
   paymentValue: {
-    ...createTextStyle('sm', 'medium', Theme.colors.neutral[900]),
-  },
-  paymentTotal: {
-    paddingTop: Theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Theme.colors.neutral[200],
+    ...createTextStyle('sm', 'semibold', Theme.colors.neutral[900]),
+    flexShrink: 1,
   },
   paymentTotalLabel: {
-    ...createTextStyle('base', 'semibold', Theme.colors.neutral[900]),
+    ...createTextStyle('base', 'bold', Theme.colors.neutral[900]),
+    flex: 1,
   },
   paymentTotalValue: {
-    ...createTextStyle('base', 'bold', Theme.colors.primary[500]),
+    ...createTextStyle('lg', 'bold', Theme.colors.primary[500]),
+    flexShrink: 1,
   },
 });
-
-

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,34 @@ import {
   Phone,
   MessageCircle,
   RefreshCw,
+  Zap,
+  Truck,
+  ChevronRight,
 } from 'lucide-react-native';
 import { Theme, createCardStyle, createTextStyle } from '@/constants/theme';
 import { deliveryService } from '@/services/deliveryService';
 import { DeliveryRequest } from '@/types/client';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+
+type DeliveryFilter = 'ALL' | 'EXPRESS' | 'STANDARD';
 
 export default function ClientOrdersScreen() {
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const router = useRouter();
   const [orders, setOrders] = useState<DeliveryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<DeliveryFilter>('ALL');
+
+  // Définir le filtre initial depuis les paramètres URL
+  useEffect(() => {
+    if (params.filter) {
+      const filter = params.filter.toUpperCase() as DeliveryFilter;
+      if (filter === 'EXPRESS' || filter === 'STANDARD') {
+        setActiveFilter(filter);
+      }
+    }
+  }, [params.filter]);
 
   const formatCurrency = (amount: number) => {
     return (
@@ -68,8 +87,10 @@ export default function ClientOrdersScreen() {
 
       // Use the correct endpoint and DTO from API_ENDPOINTS.md
       const clientMissions = await deliveryService.getClientMissions();
-      console.log('Fetched clientMissions:', clientMissions);
-      if (clientMissions && Array.isArray(clientMissions.payload)) {
+      console.log('Client missions:', clientMissions);
+      
+      // Gérer le cas où payload est null, undefined, ou un tableau
+      if (clientMissions?.payload && Array.isArray(clientMissions.payload)) {
         setOrders(clientMissions.payload);
       } else {
         setOrders([]);
@@ -90,8 +111,20 @@ export default function ClientOrdersScreen() {
     fetchOrders();
   }, []);
 
+  // Rafraîchir les données quand l'écran devient actif
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
+
   const handleRefresh = () => {
     fetchOrders(true);
+  };
+
+  const handleOrderPress = (missionId: string) => {
+    console.log('Navigating to mission:', missionId);
+    router.push(`/(client)/order-tracking/${missionId}` as any);
   };
 
   const getStatusColor = (status: string) => {
@@ -158,6 +191,14 @@ export default function ClientOrdersScreen() {
     }
   };
 
+  // Filtrer les commandes selon le filtre actif
+  const filteredOrders = orders.filter((order) => {
+    if (activeFilter === 'ALL') return true;
+    if (activeFilter === 'EXPRESS') return order.deliveryType === 'EXPRESS';
+    if (activeFilter === 'STANDARD') return order.deliveryType === 'STANDARD';
+    return true;
+  });
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -190,12 +231,87 @@ export default function ClientOrdersScreen() {
         </View>
       </View>
 
+      {/* Filtres de type de livraison */}
+      <View style={styles.filtersContainer}>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            activeFilter === 'ALL' && styles.filterButtonActive,
+          ]}
+          onPress={() => setActiveFilter('ALL')}
+        >
+          <Text
+            style={[
+              styles.filterButtonText,
+              activeFilter === 'ALL' && styles.filterButtonTextActive,
+            ]}
+          >
+            Tous
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            activeFilter === 'EXPRESS' && styles.filterButtonActive,
+          ]}
+          onPress={() => setActiveFilter('EXPRESS')}
+        >
+          <Zap
+            size={16}
+            color={
+              activeFilter === 'EXPRESS'
+                ? Theme.colors.white
+                : Theme.colors.primary[600]
+            }
+          />
+          <Text
+            style={[
+              styles.filterButtonText,
+              activeFilter === 'EXPRESS' && styles.filterButtonTextActive,
+            ]}
+          >
+            Express
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            activeFilter === 'STANDARD' && styles.filterButtonActive,
+          ]}
+          onPress={() => setActiveFilter('STANDARD')}
+        >
+          <Truck
+            size={16}
+            color={
+              activeFilter === 'STANDARD'
+                ? Theme.colors.white
+                : Theme.colors.secondary[600]
+            }
+          />
+          <Text
+            style={[
+              styles.filterButtonText,
+              activeFilter === 'STANDARD' && styles.filterButtonTextActive,
+            ]}
+          >
+            Standard
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {orders.map((order) => (
-          <View key={order.id} style={styles.orderCard}>
+        {filteredOrders.map((order) => (
+          <TouchableOpacity
+            key={order.id}
+            style={styles.orderCard}
+            onPress={() => handleOrderPress(order.id)}
+            activeOpacity={0.7}
+          >
             {/* Order Header */}
             <View style={styles.orderHeader}>
               <View style={styles.orderInfo}>
@@ -218,6 +334,39 @@ export default function ClientOrdersScreen() {
                   <Text style={styles.orderTime}>
                     {formatDate(order.createdAt)}
                   </Text>
+                </View>
+                {/* Badge de type de livraison */}
+                <View style={styles.deliveryTypeContainer}>
+                  <View
+                    style={[
+                      styles.deliveryTypeBadge,
+                      {
+                        backgroundColor:
+                          order.deliveryType === 'EXPRESS'
+                            ? Theme.colors.primary[100]
+                            : Theme.colors.secondary[100],
+                      },
+                    ]}
+                  >
+                    {order.deliveryType === 'EXPRESS' ? (
+                      <Zap size={12} color={Theme.colors.primary[600]} />
+                    ) : (
+                      <Truck size={12} color={Theme.colors.secondary[600]} />
+                    )}
+                    <Text
+                      style={[
+                        styles.deliveryTypeText,
+                        {
+                          color:
+                            order.deliveryType === 'EXPRESS'
+                              ? Theme.colors.primary[600]
+                              : Theme.colors.secondary[600],
+                        },
+                      ]}
+                    >
+                      {order.deliveryType === 'EXPRESS' ? 'Express' : 'Standard'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.paymentStatusContainer}>
                   <View
@@ -348,7 +497,7 @@ export default function ClientOrdersScreen() {
 
             {order.status === 'IN_PROGRESS' && (
               <View style={styles.trackingSection}>
-                <TouchableOpacity style={styles.trackButton}>
+                <View style={styles.trackButton}>
                   <MapPin
                     size={Theme.layout.iconSize.sm}
                     color={Theme.colors.white}
@@ -356,11 +505,21 @@ export default function ClientOrdersScreen() {
                   <Text style={styles.trackButtonText}>
                     Suivre en temps réel
                   </Text>
-                </TouchableOpacity>
+                </View>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
         ))}
+
+        {filteredOrders.length === 0 && !loading && orders.length > 0 && (
+          <View style={styles.emptyState}>
+            <Package size={48} color={Theme.colors.neutral[300]} />
+            <Text style={styles.emptyStateTitle}>Aucune commande {activeFilter === 'EXPRESS' ? 'Express' : 'Standard'}</Text>
+            <Text style={styles.emptyStateText}>
+              Vous n&apos;avez pas encore de commande de ce type
+            </Text>
+          </View>
+        )}
 
         {orders.length === 0 && !loading && (
           <View style={styles.emptyState}>
@@ -590,5 +749,50 @@ const styles = StyleSheet.create({
     ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
     textAlign: 'center',
     paddingHorizontal: Theme.spacing['3xl'],
+  },
+  filtersContainer: {
+    flexDirection: 'row',
+    gap: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
+    backgroundColor: Theme.colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.neutral[200],
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    borderRadius: Theme.borderRadius.lg,
+    backgroundColor: Theme.colors.neutral[100],
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterButtonActive: {
+    backgroundColor: Theme.colors.primary[500],
+    borderColor: Theme.colors.primary[600],
+  },
+  filterButtonText: {
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[700]),
+  },
+  filterButtonTextActive: {
+    color: Theme.colors.white,
+  },
+  deliveryTypeContainer: {
+    marginTop: Theme.spacing.sm,
+  },
+  deliveryTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  deliveryTypeText: {
+    ...createTextStyle('xs', 'semibold'),
   },
 });

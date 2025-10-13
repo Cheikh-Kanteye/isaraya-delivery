@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -41,11 +40,31 @@ export default function WelcomeScreenModern() {
 
   useEffect(() => {
     // Redirect authenticated users
+    console.log('isAuthenticated', isAuthenticated);
+    console.log('entity', entity);
     if (isAuthenticated && entity) {
-      if (entity.role === 'client') {
+      console.log('entity.role:', entity.role);
+      console.log('entity.roles:', entity.roles);
+      
+      // Handle both old and new role formats
+      let userRole = entity.role;
+      if (!userRole && entity.roles && entity.roles.length > 0) {
+        const extractedRole = entity.roles[0].name.toLowerCase();
+        // Ensure the role is one of the valid types
+        if (extractedRole === 'client' || extractedRole === 'deliver' || extractedRole === 'admin') {
+          userRole = extractedRole as 'client' | 'deliver' | 'admin';
+        }
+        console.log('Extracted role from roles array:', userRole);
+      }
+      
+      if (userRole === 'client') {
+        console.log('Redirecting to client tabs');
         router.replace('/(client)/(tabs)');
-      } else if (entity.role === 'deliver') {
+      } else if (userRole === 'deliver') {
+        console.log('Redirecting to deliver tabs');
         router.replace('/(deliver)/(tabs)');
+      } else {
+        console.log('Unknown role:', userRole);
       }
       return;
     }
@@ -111,6 +130,7 @@ export default function WelcomeScreenModern() {
         }),
       ])
     ).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, entity, router]);
 
   if (isLoading) {

@@ -11,4 +11,5 @@ export interface Order {
   urgent: boolean;
   lat: number; // Added for map markers
   lng: number; // Added for map markers
+  phone?: string; // Customer phone number
 }

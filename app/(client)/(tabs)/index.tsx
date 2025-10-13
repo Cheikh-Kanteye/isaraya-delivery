@@ -70,7 +70,7 @@ export default function ClientHomeScreenImproved() {
             <TouchableOpacity
               style={[styles.quickActionCard, styles.expressCard]}
               onPress={() =>
-                router.push('/(client)/(tabs)/search?type=express')
+                router.push('/(client)/(tabs)/orders?filter=express')
               }
               activeOpacity={0.8}
             >
@@ -98,7 +98,7 @@ export default function ClientHomeScreenImproved() {
             <TouchableOpacity
               style={[styles.quickActionCard, styles.standardCard]}
               onPress={() =>
-                router.push('/(client)/(tabs)/search?type=standard')
+                router.push('/(client)/(tabs)/orders?filter=standard')
               }
               activeOpacity={0.8}
             >

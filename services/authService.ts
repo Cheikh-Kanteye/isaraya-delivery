@@ -8,16 +8,46 @@ import {
   ResetPasswordData,
 } from '@/types/auth';
 import { DeliveryRequest, Payment } from '@/types/client';
-import { API_URL, STORAGE_KEYS } from '@/constants';
+import { API_URL, STORAGE_KEYS, TOKEN_EXPIRY_DURATION } from '@/constants';
 
 export class AuthService<T extends BaseUser> {
   protected currentUser: T | null = null;
+
+  // Helper method to check if token is expired
+  async isTokenExpired(): Promise<boolean> {
+    try {
+      const expiryStr = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRY);
+      if (!expiryStr) {
+        return true; // No expiry date means token is invalid
+      }
+
+      const expiryDate = new Date(expiryStr);
+      const now = new Date();
+      
+      return now >= expiryDate;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired on error
+    }
+  }
 
   // Helper method to make API requests
   private async makeRequest(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<any> {
+    // Check if API_URL is configured
+    if (!API_URL) {
+      throw new Error('Configuration API manquante. Veuillez configurer EXPO_PUBLIC_API_URL.');
+    }
+
+    // Check token expiration before making request
+    const isExpired = await this.isTokenExpired();
+    if (isExpired && endpoint !== '/login' && endpoint !== '/register') {
+      await this.logout();
+      throw new Error('Votre session a expiré. Veuillez vous reconnecter.');
+    }
+
     const url = `${API_URL}/auth${endpoint}`;
     console.log('url: ', url);
 
@@ -44,6 +74,12 @@ export class AuthService<T extends BaseUser> {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle 401 Unauthorized (token expired or invalid)
+        if (response.status === 401) {
+          await this.logout();
+          throw new Error('Session expirée. Veuillez vous reconnecter.');
+        }
+        
         throw new Error(
           data.message || `HTTP error! status: ${response.status}`
         );
@@ -104,19 +140,30 @@ export class AuthService<T extends BaseUser> {
       // Map backend user structure to frontend structure
       const userWithRole = {
         ...user,
-        role: userRole.toLowerCase(),
-        phoneNumber: user.phone || user.phoneNumber, // Handle field mapping
-        name: `${user.firstName} ${user.lastName}`, // Combine names for compatibility
+        role: userRole.toLowerCase() as 'admin' | 'deliver' | 'client',
+        phoneNumber: user.phone || user.phoneNumber,
+        phone: user.phone || user.phoneNumber,
+        name: user.name || `${user.firstName} ${user.lastName}`,
       };
 
       this.currentUser = userWithRole;
 
-      // Store user and token in AsyncStorage
+      // Calculate token expiry (1 day from now)
+      const expiryDate = new Date();
+      expiryDate.setTime(expiryDate.getTime() + TOKEN_EXPIRY_DURATION);
+
+      // Store user, token, and expiry date in AsyncStorage
       await AsyncStorage.setItem(
         STORAGE_KEYS.AUTH_USER,
         JSON.stringify(userWithRole)
       );
       await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, accessToken);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.TOKEN_EXPIRY,
+        expiryDate.toISOString()
+      );
+
+      console.log('Token stocké avec expiration:', expiryDate.toISOString());
 
       return userWithRole;
     } catch (error) {
@@ -193,6 +240,7 @@ export class AuthService<T extends BaseUser> {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.AUTH_USER,
       STORAGE_KEYS.AUTH_TOKEN,
+      STORAGE_KEYS.TOKEN_EXPIRY,
     ]);
   }
 
@@ -265,7 +313,7 @@ export class AuthService<T extends BaseUser> {
       });
 
       // Correction: adapter selon la structure de réponse du backend
-      const user = response.payload?.user || response.user || response;
+      const user = response.payload;
       this.currentUser = user;
 
       console.log(response);
@@ -291,6 +339,27 @@ export class AuthService<T extends BaseUser> {
       if (stored) {
         const user = JSON.parse(stored);
 
+        // Normalize user data
+        if (user) {
+          // Ensure the user has the correct role format
+          if (!user.role && user.roles && user.roles.length > 0) {
+            user.role = user.roles[0].name.toLowerCase();
+          }
+          
+          // Normalize phone fields
+          if (!user.phoneNumber && user.phone) {
+            user.phoneNumber = user.phone;
+          }
+          if (!user.phone && user.phoneNumber) {
+            user.phone = user.phoneNumber;
+          }
+          
+          // Ensure name field exists
+          if (!user.name && user.firstName && user.lastName) {
+            user.name = `${user.firstName} ${user.lastName}`;
+          }
+        }
+
         this.currentUser = user;
         return this.currentUser;
       }
@@ -310,7 +379,7 @@ export class AuthService<T extends BaseUser> {
       });
 
       // Correction: adapter selon la structure de réponse du backend
-      const user = response.payload?.user || response.user || response;
+      const user = response.payload;
       this.currentUser = user;
 
       // Update user in AsyncStorage
@@ -328,9 +397,19 @@ export class AuthService<T extends BaseUser> {
     try {
       const user = await this.getCurrentUser();
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      
       if (!user || !token) {
         return false;
       }
+
+      // Check if token is expired
+      const isExpired = await this.isTokenExpired();
+      if (isExpired) {
+        console.log('Token expiré, déconnexion automatique');
+        await this.logout();
+        return false;
+      }
+
       return true;
     } catch (error) {
       console.error('Error checking authentication status:', error);
@@ -371,6 +450,7 @@ export class AuthService<T extends BaseUser> {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.AUTH_USER,
         STORAGE_KEYS.AUTH_TOKEN,
+        STORAGE_KEYS.TOKEN_EXPIRY,
       ]);
       this.currentUser = null;
     } catch (error) {
@@ -391,10 +471,44 @@ export class AuthService<T extends BaseUser> {
   // Method to manually set auth token (useful for testing or external auth)
   async setAuthToken(token: string): Promise<void> {
     try {
+      // Calculate expiry date
+      const expiryDate = new Date();
+      expiryDate.setTime(expiryDate.getTime() + TOKEN_EXPIRY_DURATION);
+
       await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.TOKEN_EXPIRY,
+        expiryDate.toISOString()
+      );
     } catch (error) {
       console.error('Error setting auth token:', error);
     }
+  }
+
+  // Method to get remaining time before token expiration
+  async getTokenRemainingTime(): Promise<number> {
+    try {
+      const expiryStr = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRY);
+      if (!expiryStr) {
+        return 0;
+      }
+
+      const expiryDate = new Date(expiryStr);
+      const now = new Date();
+      const remaining = expiryDate.getTime() - now.getTime();
+
+      return remaining > 0 ? remaining : 0;
+    } catch (error) {
+      console.error('Error getting token remaining time:', error);
+      return 0;
+    }
+  }
+
+  // Method to check if token will expire soon (less than 1 hour)
+  async isTokenExpiringSoon(): Promise<boolean> {
+    const remaining = await this.getTokenRemainingTime();
+    const oneHour = 60 * 60 * 1000;
+    return remaining > 0 && remaining < oneHour;
   }
 
   async createDeliveryRequest(

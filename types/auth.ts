@@ -1,18 +1,27 @@
+export interface Role {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BaseUser {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  name?: string; // For compatibility
-  phoneNumber: string; // Unified field (phoneNumber -> phone)
-  phone?: string; // Backend field
+  name: string; // Combined firstName + lastName from backend
+  phoneNumber: string; // Normalized field
+  phone: string; // Backend field
   profilePicture?: string;
-  role: 'admin' | 'deliver' | 'client';
-  roles?: Array<{ id: string; name: string }>; // Backend format
-  status: 'verified' | 'pending' | 'unverified' | 'suspended';
+  password?: string; // Backend includes this (should not be used in frontend)
+  role: 'admin' | 'deliver' | 'client'; // Normalized lowercase role
+  roles: Role[]; // Backend format (array of role objects)
+  status?: 'verified' | 'pending' | 'unverified' | 'suspended';
   isActive: boolean; // Backend field for email verification
-  createdAt?: string;
-  updatedAt?: string;
+  isOnline?: boolean; // Backend field for deliver
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Deliver extends BaseUser {

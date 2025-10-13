@@ -3,6 +3,12 @@ import { DeliveryRequest, DeliveryResponse } from '@/types/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types for delivery endpoints
+interface ApiResponse<T> {
+  status: string;
+  message: string;
+  payload: T;
+}
+
 interface AcceptMissionDto {
   missionId: string;
   livreurId: string;
@@ -16,6 +22,29 @@ interface UpdateStatusDto {
 interface PositionDto {
   latitude: number;
   longitude: number;
+}
+
+interface RecentStat {
+  id: string;
+  date: string;
+  amount: number;
+  deliveries: number;
+  hours: string;
+}
+
+interface Goal {
+  current: number;
+  target: number;
+  percentage: number;
+}
+
+export interface DelivererStats {
+  total: number;
+  deliveries: number;
+  hours: string;
+  average: number;
+  recent: RecentStat[];
+  goal: Goal;
 }
 
 // Service pour gérer les requêtes de livraison
@@ -78,30 +107,38 @@ export const deliveryService = {
     }
   },
 
-  async getMissionById(id: string): Promise<DeliveryResponse> {
+  async getMissionById(id: string): Promise<ApiResponse<DeliveryRequest>> {
     try {
+      console.log('getMissionById called with id:', id, 'type:', typeof id);
       const headers = await this.getHeaders();
 
-      const response = await fetch(`${API_URL}/delivery/missions/${id}`, {
+      const url = `${API_URL}/delivery/missions/${id}`;
+      console.log('Fetching mission from URL:', url);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers,
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
         throw new Error(
           `Erreur HTTP ${response.status}: ${response.statusText}`
         );
       }
 
       const mission = await response.json();
-      return mission.payload?.data || mission.data || mission;
+      return mission;
     } catch (error) {
       console.error('Erreur dans getMissionById:', error);
       throw error;
     }
   },
 
-  async getClientMissions(): Promise<DeliveryResponse> {
+  async getClientMissions(): Promise<ApiResponse<DeliveryRequest[]>> {
     try {
       const headers = await this.getHeaders();
 
@@ -117,14 +154,14 @@ export const deliveryService = {
       }
 
       const missions = await response.json();
-      return missions.payload?.data || missions.data || missions;
+      return missions;
     } catch (error) {
       console.error('Erreur dans getClientMissions:', error);
       throw error;
     }
   },
 
-  async getDelivererMissions(): Promise<DeliveryResponse> {
+  async getDelivererMissions(): Promise<ApiResponse<DeliveryRequest[]>> {
     try {
       const headers = await this.getHeaders();
 
@@ -140,14 +177,14 @@ export const deliveryService = {
       }
 
       const missions = await response.json();
-      return missions.payload?.data || missions.data || missions;
+      return missions;
     } catch (error) {
       console.error('Erreur dans getDelivererMissions:', error);
       throw error;
     }
   },
 
-  async getPendingMissions(): Promise<DeliveryResponse> {
+  async getPendingMissions(): Promise<ApiResponse<DeliveryRequest[]>> {
     try {
       const headers = await this.getHeaders();
 
@@ -163,7 +200,7 @@ export const deliveryService = {
       }
 
       const missions = await response.json();
-      return missions.payload?.data || missions.data || missions;
+      return missions;
     } catch (error) {
       console.error('Erreur dans getPendingMissions:', error);
       throw error;
@@ -220,6 +257,8 @@ export const deliveryService = {
 
         throw new Error(errorMessage);
       }
+
+      console.log("Update mission finished:", await response.json())
     } catch (error) {
       console.error('Erreur dans updateMissionStatus:', error);
       throw error;
@@ -256,6 +295,31 @@ export const deliveryService = {
       }
     } catch (error) {
       console.error('Erreur dans updateMissionPosition:', error);
+      throw error;
+    }
+  },
+
+  async getDelivererStats(): Promise<ApiResponse<DelivererStats>> {
+    try {
+      const headers = await this.getHeaders();
+      const url = `${API_URL}/delivery/livreur/stats`;
+      console.log(url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Erreur HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erreur dans getDelivererStats:', error);
       throw error;
     }
   },

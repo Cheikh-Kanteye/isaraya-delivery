@@ -24,6 +24,7 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import AddressAutocomplete from '@/components/client/AddressAutocomplete';
+import { reverseGeocode } from '@/utils/geocoding';
 
 export default function CreateOrderScreen() {
   const { entity: client } = useAuth<Client>();
@@ -88,16 +89,39 @@ export default function CreateOrderScreen() {
       return;
     }
 
-    const addressText = `Ma position actuelle`;
+    try {
+      // Afficher un indicateur de chargement temporaire
+      const loadingText = 'Récupération de l\'adresse...';
+      
+      if (type === 'pickup') {
+        setPickupAddress(loadingText);
+        pickupAutocompleteRef.current?.setAddressText(loadingText);
+      } else {
+        setDeliveryAddress(loadingText);
+        deliveryAutocompleteRef.current?.setAddressText(loadingText);
+      }
 
-    if (type === 'pickup') {
-      setPickupAddress(addressText);
-      setPickupCoordinates(location);
-      pickupAutocompleteRef.current?.setAddressText(addressText);
-    } else {
-      setDeliveryAddress(addressText);
-      setDeliveryCoordinates(location);
-      deliveryAutocompleteRef.current?.setAddressText(addressText);
+      // Convertir les coordonnées en adresse réelle
+      const address = await reverseGeocode(location);
+
+      if (type === 'pickup') {
+        setPickupAddress(address);
+        setPickupCoordinates(location);
+        pickupAutocompleteRef.current?.setAddressText(address);
+      } else {
+        setDeliveryAddress(address);
+        setDeliveryCoordinates(location);
+        deliveryAutocompleteRef.current?.setAddressText(address);
+      }
+
+      console.log(`Adresse géocodée (${type}):`, address);
+    } catch (error) {
+      console.error('Erreur lors du géocodage:', error);
+      Alert.alert(
+        'Erreur',
+        'Impossible de récupérer l\'adresse. Veuillez saisir manuellement.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -106,6 +130,19 @@ export default function CreateOrderScreen() {
       Alert.alert(
         'Adresses requises',
         'Veuillez spécifier une adresse de départ et une adresse de livraison.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Vérifier que les adresses ne sont pas en cours de chargement
+    if (
+      pickupAddress.includes('Récupération de l\'adresse') ||
+      deliveryAddress.includes('Récupération de l\'adresse')
+    ) {
+      Alert.alert(
+        'Veuillez patienter',
+        'Récupération des adresses en cours...',
         [{ text: 'OK' }]
       );
       return;

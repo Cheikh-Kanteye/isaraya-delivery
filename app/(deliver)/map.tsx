@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,17 @@ import {
   FlatList,
   Dimensions,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { orders as ConstantOrders } from '@/constants/orders';
 import OrderCard from '@/components/orders/OrderCard';
 import { Theme, createTextStyle } from '@/constants/theme';
 import { Order } from '@/types/orders';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { X } from 'lucide-react-native';
+import { deliveryService } from '@/services/deliveryService';
+import { DeliveryRequest } from '@/types/client';
+import { useFocusEffect } from 'expo-router';
 
 // HTML content for the Leaflet map with Routing Machine
 const mapHtml = `
@@ -110,12 +113,79 @@ const mapHtml = `
 
 const Map: React.FC = () => {
   const webViewRef = useRef<WebView>(null);
-  const [orders, setOrders] = useState<Order[]>(ConstantOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(
     null
   );
   const { location, isLoading, error, startTracking, stopTracking } =
     useUserLocation();
+
+  // Fonction pour charger les missions depuis l'API
+  const fetchMissions = async () => {
+    try {
+      setLoading(true);
+      const response = await deliveryService.getPendingMissions();
+      
+      const missions = Array.isArray(response.payload) 
+        ? response.payload 
+        : response.payload 
+        ? [response.payload] 
+        : [];
+
+      // Mapper les missions vers le format Order
+      const mappedOrders: Order[] = missions.map((mission: DeliveryRequest) => {
+        let status: Order['status'] = 'available';
+        const missionStatus = mission.status as string;
+        if (missionStatus === 'PENDING' || missionStatus === 'ASSIGNED')
+          status = 'available';
+        else if (missionStatus === 'ACCEPTED') status = 'accepted';
+        else if (missionStatus === 'IN_PROGRESS') status = 'picked_up';
+        else if (missionStatus === 'DELIVERED') status = 'delivered';
+
+        return {
+          id: mission.id,
+          restaurant: mission.pickupAddress,
+          customer: 'Client', // Placeholder
+          address: mission.destinationAddress,
+          items: 1, // Placeholder
+          distance: mission.distance ? `${mission.distance} km` : 'N/A',
+          time: mission.estimatedDuration
+            ? `${mission.estimatedDuration} min`
+            : 'N/A',
+          earnings: mission.deliveryFee,
+          status,
+          urgent: false, // Pas d'info d'urgence dans l'API
+          lat: mission.pickupLatitude,
+          lng: mission.pickupLongitude,
+        };
+      });
+
+      setOrders(mappedOrders);
+    } catch (error) {
+      console.error('Error fetching missions:', error);
+      Alert.alert('Erreur', 'Impossible de charger les missions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger les missions au montage et avec rafraîchissement automatique
+  useEffect(() => {
+    fetchMissions();
+    
+    // Refresh automatique toutes les 30 secondes
+    const interval = setInterval(fetchMissions, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Rafraîchir les données quand l'écran devient actif
+  useFocusEffect(
+    useCallback(() => {
+      fetchMissions();
+    }, [])
+  );
 
   // Send map center, markers, and user location to WebView when not navigating
   useEffect(() => {
@@ -161,30 +231,65 @@ const Map: React.FC = () => {
     `);
   }, [location, navigatingOrderId, orders]);
 
-  const handleAccept = (orderId: string): void => {
-    console.log(`Accepted delivery: ${orderId}`);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: 'accepted' } : order
-      )
-    );
+  const handleAccept = async (orderId: string): Promise<void> => {
+    try {
+      console.log(`Accepted delivery: ${orderId}`);
+      
+      // Appeler l'API pour accepter la mission
+      await deliveryService.acceptMission({
+        missionId: orderId,
+        livreurId: 'current-user-id', // TODO: Récupérer l'ID du livreur depuis le contexte auth
+      });
+      
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order.id === orderId ? { ...order, status: 'accepted' } : order
+        )
+      );
+      
+      Alert.alert('Succès', 'Mission acceptée avec succès');
+    } catch (error) {
+      console.error('Error accepting mission:', error);
+      Alert.alert('Erreur', 'Impossible d\'accepter la mission');
+    }
   };
 
   const handleDecline = (orderId: string): void => {
-    console.log(`Declined delivery: ${orderId}`);
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: 'rejected' } : order
-      )
+    Alert.alert(
+      'Refuser la mission',
+      'Êtes-vous sûr de vouloir refuser cette mission ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Refuser',
+          style: 'destructive',
+          onPress: () => {
+            console.log(`Declined delivery: ${orderId}`);
+            setOrders((prevOrders) =>
+              prevOrders.map((order) =>
+                order.id === orderId ? { ...order, status: 'rejected' } : order
+              )
+            );
+          },
+        },
+      ]
     );
   };
 
   const handleCall = (orderId: string): void => {
-    console.log(`Call customer: ${orderId}`);
+    Alert.alert(
+      'Appel client',
+      'Les informations de contact du client ne sont pas disponibles pour le moment.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleMessage = (orderId: string): void => {
-    console.log(`Message customer: ${orderId}`);
+    Alert.alert(
+      'Message client',
+      'Les informations de contact du client ne sont pas disponibles pour le moment.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleNavigate = (orderId: string): void => {
@@ -269,20 +374,26 @@ const Map: React.FC = () => {
       {/* Scrollable Cards Section (hidden during navigation) */}
       {!navigatingOrderId && (
         <View style={styles.cardsContainer}>
-          <Text style={styles.sectionTitle}>Delivery Tasks</Text>
-          <FlatList
-            data={orders}
-            renderItem={renderTaskCard}
-            keyExtractor={(item: Order) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.flatListContent}
-            snapToAlignment="center"
-            snapToInterval={
-              Dimensions.get('window').width * 0.9 + Theme.spacing.xs * 2
-            }
-            scrollEventThrottle={16}
-          />
+          <Text style={styles.sectionTitle}>Missions disponibles</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Chargement des missions...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={orders}
+              renderItem={renderTaskCard}
+              keyExtractor={(item: Order) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.flatListContent}
+              snapToAlignment="center"
+              snapToInterval={
+                Dimensions.get('window').width * 0.9 + Theme.spacing.xs * 2
+              }
+              scrollEventThrottle={16}
+            />
+          )}
         </View>
       )}
     </View>
@@ -331,5 +442,12 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     ...createTextStyle('sm', 'semibold', Theme.colors.white),
+  },
+  loadingContainer: {
+    paddingVertical: Theme.spacing.xl,
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...createTextStyle('base', 'medium', Theme.colors.neutral[600]),
   },
 });

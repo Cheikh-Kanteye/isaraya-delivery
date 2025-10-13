@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,14 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   User,
-  Settings,
-  Bell,
   CreditCard,
-  FileText,
   CircleHelp as HelpCircle,
   LogOut,
   ChevronRight,
@@ -23,14 +22,54 @@ import {
   Phone,
   Mail,
   MapPin,
-  CreditCard as Edit,
+  Package,
+  TrendingUp,
 } from 'lucide-react-native';
-import { Theme, createCardStyle, createTextStyle } from '@/constants/theme';
+import { Theme, createTextStyle } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Deliver } from '@/types/auth';
+import { useRouter } from 'expo-router';
+import { deliveryService, DelivererStats } from '@/services/deliveryService';
 
 export default function ProfileScreen() {
   const { entity: deliver, logout } = useAuth<Deliver>();
+  const router = useRouter();
+  const [stats, setStats] = useState<DelivererStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Fetch deliverer stats
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const response = await deliveryService.getDelivererStats();
+      // Extract the payload from the API response
+      setStats(response.payload || response);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -42,45 +81,17 @@ export default function ProfileScreen() {
     },
     {
       id: 2,
-      title: 'Notifications',
-      icon: Bell,
-      subtitle: 'Gérer les notifications',
-      action: () => console.log('Notifications'),
-    },
-    {
-      id: 3,
       title: 'Paiements',
       icon: CreditCard,
       subtitle: 'Méthodes de paiement',
       action: () => console.log('Payments'),
     },
     {
-      id: 4,
-      title: 'Documents',
-      icon: FileText,
-      subtitle: 'Permis, assurance, etc.',
-      action: () => console.log('Documents'),
-    },
-    {
-      id: 5,
-      title: 'Véhicule',
-      icon: Truck,
-      subtitle: 'Gérer votre véhicule',
-      action: () => console.log('Vehicle'),
-    },
-    {
-      id: 6,
-      title: 'Paramètres',
-      icon: Settings,
-      subtitle: "Préférences de l'app",
-      action: () => console.log('Settings'),
-    },
-    {
-      id: 7,
+      id: 3,
       title: 'Aide et support',
       icon: HelpCircle,
       subtitle: 'FAQ et contact',
-      action: () => console.log('Help'),
+      action: () => router.navigate('/help'),
     },
   ];
 
@@ -93,195 +104,294 @@ export default function ProfileScreen() {
   };
 
   if (!deliver) {
-    return null; // This shouldn't happen due to AuthGuard, but just in case
+    return null;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
-        <TouchableOpacity style={styles.editButton}>
-          <Edit
-            size={Theme.layout.iconSize.sm}
-            color={Theme.colors.primary[500]}
-          />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          {/* Profile Picture */}
-          <View style={styles.profilePictureContainer}>
-            <Image
-              source={{
-                uri:
-                  deliver.profilePicture ||
-                  'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150',
-              }}
-              style={styles.profilePicture}
-            />
-            <View style={styles.verificationBadge}>
-              <Shield
-                size={Theme.layout.iconSize.xs}
-                color={Theme.colors.primary[500]}
-              />
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Animated.View
+            style={[
+              styles.profileHeader,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.profilePictureContainer}>
+              {deliver.profilePicture ? (
+                <Image
+                  source={{ uri: deliver.profilePicture }}
+                  style={styles.profilePicture}
+                />
+              ) : (
+                <View style={styles.profilePicture}>
+                  <Text style={styles.initialsText}>
+                    {(deliver.firstName + ' ' + deliver.lastName)
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.verificationBadge}>
+                <Shield
+                  size={Theme.layout.iconSize.xs}
+                  color={Theme.colors.primary[500]}
+                  strokeWidth={2}
+                />
+              </View>
             </View>
-          </View>
 
-          {/* Profile Info */}
-          <View style={styles.profileInfo}>
             <Text style={styles.userName}>{deliver.name}</Text>
+
             <View style={styles.ratingContainer}>
               <Star
-                size={Theme.layout.iconSize.xs}
+                size={Theme.layout.iconSize.sm}
                 color={Theme.colors.accent[500]}
+                fill={Theme.colors.accent[500]}
+                strokeWidth={2}
               />
-              <Text style={styles.rating}>{deliver.rating}</Text>
+              <Text style={styles.rating}>{deliver.rating || '5.0'}</Text>
               <Text style={styles.ratingText}>
-                ({deliver.totalDeliveries} livraisons)
+                ({(stats?.deliveries ?? deliver.totalDeliveries ?? 0)} livraisons)
               </Text>
             </View>
-            <Text style={styles.joinDate}>
-              Membre depuis {deliver.joinDate}
+
+            <Text style={styles.memberSince}>
+              Membre depuis{' '}
+              {new Date(deliver.createdAt as string).toLocaleDateString('fr-FR', {
+                month: 'long',
+                year: 'numeric',
+              })}
             </Text>
-          </View>
+          </Animated.View>
         </View>
 
+        {/* Stats Card */}
+        <Animated.View
+          style={[
+            styles.statsContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Package
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {loading ? '...' : (stats?.deliveries ?? 0)}
+              </Text>
+              <Text style={styles.statLabel}>Livraisons</Text>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <TrendingUp
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.success[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {loading ? '...' : `${(stats?.total ?? 0).toLocaleString('fr-FR')} F`}
+              </Text>
+              <Text style={styles.statLabel}>Total gagné</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Additional Stats */}
+        {stats && (
+          <View style={styles.section}>
+            <View style={styles.additionalStatsCard}>
+              <View style={styles.additionalStatRow}>
+                <View style={styles.additionalStatItem}>
+                  <Text style={styles.additionalStatLabel}>Heures</Text>
+                  <Text style={styles.additionalStatValue}>{stats.hours ?? '0h'}</Text>
+                </View>
+                <View style={styles.additionalStatItem}>
+                  <Text style={styles.additionalStatLabel}>Moyenne</Text>
+                  <Text style={styles.additionalStatValue}>
+                    {(stats.average ?? 0).toLocaleString('fr-FR')} F
+                  </Text>
+                </View>
+              </View>
+              {stats.goal && (
+                <View style={styles.goalContainer}>
+                  <View style={styles.goalHeader}>
+                    <Text style={styles.goalLabel}>Objectif mensuel</Text>
+                    <Text style={styles.goalPercentage}>
+                      {(stats.goal.percentage ?? 0).toFixed(1)}%
+                    </Text>
+                  </View>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        { width: `${Math.min(stats.goal.percentage ?? 0, 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.goalFooter}>
+                    <Text style={styles.goalText}>
+                      {(stats.goal.current ?? 0).toLocaleString('fr-FR')} F
+                    </Text>
+                    <Text style={styles.goalText}>
+                      {(stats.goal.target ?? 0).toLocaleString('fr-FR')} F
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Contact Info */}
-        <View style={styles.contactCard}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations de contact</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoItem}>
+              <Mail
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.neutral[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.infoText}>{deliver.email}</Text>
+            </View>
 
-          <View style={styles.contactItem}>
-            <Mail
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.contactText}>{deliver.email}</Text>
-          </View>
+            <View style={styles.infoDivider} />
 
-          <View style={styles.contactItem}>
-            <Phone
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.contactText}>{deliver.phoneNumber}</Text>
-          </View>
+            <View style={styles.infoItem}>
+              <Phone
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.neutral[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.infoText}>{deliver.phoneNumber}</Text>
+            </View>
 
-          <View style={styles.contactItem}>
-            <MapPin
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.contactText}>{deliver.address}</Text>
+            {deliver.address && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <MapPin
+                    size={Theme.layout.iconSize.sm}
+                    color={Theme.colors.neutral[500]}
+                    strokeWidth={2}
+                  />
+                  <Text style={styles.infoText}>{deliver.address}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
         {/* Vehicle Info */}
-        <View style={styles.vehicleCard}>
-          <View style={styles.vehicleHeader}>
-            <Truck
-              size={Theme.layout.iconSize.sm}
-              color={Theme.colors.secondary[500]}
-            />
-            <Text style={styles.vehicleTitle}>Véhicule</Text>
-          </View>
-
-          <View style={styles.vehicleInfo}>
-            <Text style={styles.vehicleType}>{deliver.vehicle}</Text>
-            <View
-              style={[
-                styles.statusBadge,
-                deliver.status === 'verified'
-                  ? styles.verifiedBadge
-                  : styles.pendingBadge,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  deliver.status === 'verified'
-                    ? styles.verifiedText
-                    : styles.pendingText,
-                ]}
-              >
-                {deliver.status === 'verified' ? 'Vérifié' : 'En attente'}
-              </Text>
+        {deliver.vehicle && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Véhicule</Text>
+            <View style={styles.vehicleCard}>
+              <View style={styles.vehicleContent}>
+                <Truck
+                  size={Theme.layout.iconSize.md}
+                  color={Theme.colors.secondary[500]}
+                  strokeWidth={2}
+                />
+                <View style={styles.vehicleInfo}>
+                  <Text style={styles.vehicleType}>{deliver.vehicle}</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      deliver.status === 'verified'
+                        ? styles.verifiedBadge
+                        : styles.pendingBadge,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        deliver.status === 'verified'
+                          ? styles.verifiedText
+                          : styles.pendingText,
+                      ]}
+                    >
+                      {deliver.status === 'verified' ? 'Vérifié' : 'En attente'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Menu Items */}
-        <View style={styles.menuCard}>
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.menuItem}
-              onPress={item.action}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
+        <View style={styles.section}>
+          <View style={styles.menuCard}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.menuItem,
+                  index === menuItems.length - 1 && styles.menuItemLast,
+                ]}
+                onPress={item.action}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuItemLeft}>
                   <item.icon
                     size={Theme.layout.iconSize.sm}
                     color={Theme.colors.neutral[500]}
+                    strokeWidth={2}
                   />
+                  <View style={styles.menuItemContent}>
+                    <Text style={styles.menuItemTitle}>{item.title}</Text>
+                    <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                  </View>
                 </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
-                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <ChevronRight
-                size={Theme.layout.iconSize.sm}
-                color={Theme.colors.neutral[300]}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Stats Card */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Statistiques</Text>
-
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{deliver.totalDeliveries}</Text>
-              <Text style={styles.statLabel}>Livraisons totales</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{deliver.rating}</Text>
-              <Text style={styles.statLabel}>Note moyenne</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>98%</Text>
-              <Text style={styles.statLabel}>Taux de réussite</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>156</Text>
-              <Text style={styles.statLabel}>Jours actifs</Text>
-            </View>
+                <ChevronRight
+                  size={Theme.layout.iconSize.sm}
+                  color={Theme.colors.neutral[300]}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut
-            size={Theme.layout.iconSize.sm}
-            color={Theme.colors.error[500]}
-          />
-          <Text style={styles.logoutText}>Se déconnecter</Text>
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            activeOpacity={0.8}
+          >
+            <LogOut
+              size={Theme.layout.iconSize.sm}
+              color={Theme.colors.error[500]}
+              strokeWidth={2}
+            />
+            <Text style={styles.logoutText}>Se déconnecter</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* App Version */}
+        {/* Version */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.2.3</Text>
+          <Text style={styles.versionText}>Version Livreur 1.2.3</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -293,31 +403,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Theme.colors.neutral[50],
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.neutral[200],
-  },
-  headerTitle: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.neutral[900]),
-  },
-  editButton: {
-    padding: Theme.spacing.sm,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.md,
-  },
   scrollView: {
     flex: 1,
   },
-  profileCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+
+  // Hero Section
+  heroSection: {
+    paddingTop: Theme.spacing['6xl'],
+    paddingBottom: Theme.spacing['7xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
+    backgroundColor: Theme.colors.primary[50],
+  },
+  profileHeader: {
     alignItems: 'center',
   },
   profilePictureContainer: {
@@ -325,29 +422,36 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.lg,
   },
   profilePicture: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
     borderRadius: Theme.borderRadius.full,
-    backgroundColor: Theme.colors.neutral[100],
+    borderWidth: 4,
+    borderColor: Theme.colors.white,
+    backgroundColor: Theme.colors.neutral[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialsText: {
+    ...createTextStyle('4xl', 'bold', Theme.colors.primary[500]),
+    letterSpacing: 2,
   },
   verificationBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 24,
-    height: 24,
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
     backgroundColor: Theme.colors.white,
-    borderRadius: Theme.borderRadius.md,
+    borderRadius: Theme.borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Theme.shadows.md,
-  },
-  profileInfo: {
-    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: Theme.colors.primary[50],
   },
   userName: {
-    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+    ...createTextStyle('3xl', 'bold', Theme.colors.neutral[900]),
     marginBottom: Theme.spacing.sm,
+    letterSpacing: -0.5,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -356,53 +460,99 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.xs,
   },
   rating: {
-    ...createTextStyle('base', 'semibold', Theme.colors.accent[500]),
+    ...createTextStyle('lg', 'bold', Theme.colors.accent[500]),
   },
   ratingText: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
   },
-  joinDate: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+  memberSince: {
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    opacity: 0.8,
   },
-  contactCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+
+  // Stats Section
+  statsContainer: {
+    marginTop: -50,
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['3xl'],
+  },
+  statsCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing['2xl'],
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: Theme.colors.neutral[200],
+  },
+  statValue: {
+    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+    marginTop: Theme.spacing.sm,
+    marginBottom: Theme.spacing.xs,
+  },
+  statLabel: {
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    textAlign: 'center',
+  },
+
+  // Section
+  section: {
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['2xl'],
   },
   sectionTitle: {
     ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-    marginBottom: Theme.spacing.lg,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.md,
     marginBottom: Theme.spacing.md,
   },
-  contactText: {
-    ...createTextStyle('base', 'normal', Theme.colors.neutral[700]),
+
+  // Info Card
+  infoCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
+  },
+  infoText: {
+    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
+    flex: 1,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.neutral[100],
+  },
+
+  // Vehicle Card
   vehicleCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
-  vehicleHeader: {
+  vehicleContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.md,
-  },
-  vehicleTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+    gap: Theme.spacing.lg,
   },
   vehicleInfo: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   vehicleType: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
+    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
   },
   statusBadge: {
     paddingHorizontal: Theme.spacing.md,
@@ -416,103 +566,131 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.warning[100],
   },
   statusText: {
-    ...createTextStyle('sm', 'medium'),
+    ...createTextStyle('xs', 'semibold'),
   },
   verifiedText: {
-    color: Theme.colors.success[800],
+    color: Theme.colors.success[700],
   },
   pendingText: {
-    color: Theme.colors.warning[800],
+    color: Theme.colors.warning[700],
   },
+
+  // Menu Card
   menuCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-    padding: 0,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
+    padding: Theme.spacing.xl,
     borderBottomWidth: 1,
     borderBottomColor: Theme.colors.neutral[100],
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  menuIcon: {
-    width: Theme.layout.iconSize.xl,
-    height: Theme.layout.iconSize.xl,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Theme.spacing.md,
+    gap: Theme.spacing.lg,
   },
   menuItemContent: {
     flex: 1,
   },
   menuItemTitle: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[900]),
+    ...createTextStyle('base', 'semibold', Theme.colors.neutral[900]),
     marginBottom: 2,
   },
   menuItemSubtitle: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'normal', Theme.colors.neutral[400]),
   },
-  statsCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
-  },
-  statsTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-    marginBottom: Theme.spacing.lg,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Theme.spacing.lg,
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '45%',
-    alignItems: 'center',
-    padding: Theme.spacing.lg,
-    backgroundColor: Theme.colors.neutral[50],
-    borderRadius: Theme.borderRadius.md,
-  },
-  statValue: {
-    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
-    marginBottom: Theme.spacing.xs,
-  },
-  statLabel: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
-    textAlign: 'center',
-  },
+
+  // Logout Button
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Theme.colors.white,
-    marginHorizontal: Theme.spacing.lg,
-    marginTop: Theme.spacing.lg,
     padding: Theme.spacing.lg,
-    borderRadius: Theme.borderRadius.lg,
-    gap: Theme.spacing.sm,
-    ...Theme.shadows.md,
+    borderRadius: Theme.borderRadius.xl,
+    gap: Theme.spacing.md,
   },
   logoutText: {
-    ...createTextStyle('base', 'semibold', Theme.colors.error[500]),
+    ...createTextStyle('lg', 'semibold', Theme.colors.error[500]),
   },
+
+  // Version
   versionContainer: {
     alignItems: 'center',
-    paddingVertical: Theme.spacing.xl,
+    paddingVertical: Theme.spacing['3xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
   },
   versionText: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[400]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[400]),
+  },
+
+  // Additional Stats
+  additionalStatsCard: {
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+  },
+  additionalStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: Theme.spacing.xl,
+  },
+  additionalStatItem: {
+    alignItems: 'center',
+  },
+  additionalStatLabel: {
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    marginBottom: Theme.spacing.xs,
+  },
+  additionalStatValue: {
+    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+  },
+
+  // Goal Progress
+  goalContainer: {
+    marginTop: Theme.spacing.lg,
+    paddingTop: Theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.neutral[100],
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  goalLabel: {
+    ...createTextStyle('sm', 'semibold', Theme.colors.neutral[700]),
+  },
+  goalPercentage: {
+    ...createTextStyle('lg', 'bold', Theme.colors.primary[500]),
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: Theme.colors.neutral[100],
+    borderRadius: Theme.borderRadius.full,
+    overflow: 'hidden',
+    marginBottom: Theme.spacing.sm,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: Theme.colors.primary[500],
+    borderRadius: Theme.borderRadius.full,
+  },
+  goalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  goalText: {
+    ...createTextStyle('xs', 'medium', Theme.colors.neutral[500]),
   },
 });

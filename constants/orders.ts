@@ -14,6 +14,7 @@ export const orders: Order[] = [
     urgent: true,
     lat: 14.6696,
     lng: -17.4441,
+    phone: '+221771234567',
   },
   {
     id: '2',
@@ -28,6 +29,7 @@ export const orders: Order[] = [
     urgent: false,
     lat: 14.6718,
     lng: -17.4462,
+    phone: '+221775678901',
   },
   {
     id: '3',
@@ -42,6 +44,7 @@ export const orders: Order[] = [
     urgent: false,
     lat: 14.6729,
     lng: -17.4414,
+    phone: '+221783456789',
   },
   {
     id: '4',
@@ -56,6 +59,7 @@ export const orders: Order[] = [
     urgent: false,
     lat: 14.6708,
     lng: -17.4475,
+    phone: '+221701234567',
   },
 ];
 

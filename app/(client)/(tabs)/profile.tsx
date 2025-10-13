@@ -1,3 +1,5 @@
+// Profile Client - Version complète avec stats responsive
+
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
@@ -68,6 +70,17 @@ export default function ClientProfileScreen() {
     }
   };
 
+  // Fonction pour formater les grands nombres
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   if (!client) {
     return null;
   }
@@ -113,7 +126,7 @@ export default function ClientProfileScreen() {
           </Animated.View>
         </View>
 
-        {/* Stats Card */}
+        {/* Stats Card - Responsive */}
         <Animated.View
           style={[
             styles.statsContainer,
@@ -124,14 +137,24 @@ export default function ClientProfileScreen() {
           ]}
         >
           <View style={styles.statsCard}>
-            <View style={styles.statItem}>
-              <Package
-                size={Theme.layout.iconSize.lg}
-                color={Theme.colors.primary[500]}
-                strokeWidth={2}
-              />
-              <Text style={styles.statValue}>{orders.length || 0}</Text>
-              <Text style={styles.statLabel}>Commandes</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <View style={styles.statIconContainer}>
+                  <Package
+                    size={Theme.layout.iconSize.md}
+                    color={Theme.colors.primary[500]}
+                    strokeWidth={2}
+                  />
+                </View>
+                <Text 
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {formatNumber(orders.length || 0)}
+                </Text>
+                <Text style={styles.statLabel}>Commandes</Text>
+              </View>
             </View>
           </View>
         </Animated.View>
@@ -301,7 +324,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 
-  // Stats Section
+  // Stats Section - Responsive
   statsContainer: {
     marginTop: -50,
     paddingHorizontal: Theme.spacing['2xl'],
@@ -311,18 +334,44 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.white,
     borderRadius: Theme.borderRadius.xl,
     padding: Theme.spacing['2xl'],
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Theme.spacing.xl,
   },
   statItem: {
     alignItems: 'center',
+    minWidth: 100,
+    maxWidth: 140,
+    flex: 1,
+  },
+  statIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: Theme.borderRadius.full,
+    backgroundColor: Theme.colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Theme.spacing.sm,
   },
   statValue: {
-    ...createTextStyle('4xl', 'bold', Theme.colors.neutral[900]),
-    marginTop: Theme.spacing.sm,
+    ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
     marginBottom: Theme.spacing.xs,
+    letterSpacing: -0.5,
   },
   statLabel: {
     ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
+    textAlign: 'center',
   },
 
   // Section

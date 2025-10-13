@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
-import { Alert } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Alert, Linking } from 'react-native';
 import { DeliveryRequest } from '@/types/client';
 import { Client } from '@/types/auth';
 import { deliveryService } from '@/services/deliveryService';
@@ -34,7 +33,10 @@ export function useDeliveryOrder(client: Client | undefined) {
   const pickupAutocompleteRef = useRef<AddressAutocompleteRef>(null);
   const deliveryAutocompleteRef = useRef<AddressAutocompleteRef>(null);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '0 FCFA';
+    }
     return (
       new Intl.NumberFormat('fr-FR', {
         style: 'decimal',
@@ -105,10 +107,18 @@ export function useDeliveryOrder(client: Client | undefined) {
           first_name: client!.firstName,
           last_name: client!.lastName,
         },
-        origin: 'MARKETPLACE',
+        origin: 'MOBILE_APP',
       };
       const result = await paymentService.initiatePayment(paymentData);
-      await WebBrowser.openBrowserAsync(result.redirectUrl);
+      
+      // Ouvrir l'URL de paiement dans le navigateur externe
+      const canOpen = await Linking.canOpenURL(result.redirectUrl);
+      if (canOpen) {
+        await Linking.openURL(result.redirectUrl);
+      } else {
+        throw new Error('Impossible d\'ouvrir l\'URL de paiement');
+      }
+      
       onSuccess();
     } catch (error) {
       Alert.alert(

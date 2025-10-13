@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -13,28 +15,80 @@ import {
   Clock,
   DollarSign,
   Star,
-  TrendingUp,
   Navigation,
   Phone,
   Package,
 } from 'lucide-react-native';
 import {
   Theme,
-  createCardStyle,
   createTextStyle,
-  createButtonStyle,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { Deliver } from '@/types/auth';
+import { deliveryService } from '@/services/deliveryService';
+import { DelivererStats } from '@/services/deliveryService';
 
 export default function HomeScreen() {
   const { entity: deliver, updateProfile } = useAuth<Deliver>();
   const [isOnline, setIsOnline] = useState(deliver?.isOnline || false);
+  const [stats, setStats] = useState<DelivererStats | null>(null);
+  const [pendingMissionsCount, setPendingMissionsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [statsResponse, pendingResponse] = await Promise.all([
+          deliveryService.getDelivererStats(),
+          deliveryService.getPendingMissions(),
+        ]);
+        
+        setStats(statsResponse.payload);
+        
+        // Compter les missions en attente
+        const pendingMissions = Array.isArray(pendingResponse.payload) 
+          ? pendingResponse.payload 
+          : pendingResponse.payload 
+          ? [pendingResponse.payload] 
+          : [];
+        setPendingMissionsCount(pendingMissions.length);
+      } catch (error) {
+        console.error('Error fetching home data:', error);
+        Alert.alert('Erreur', 'Impossible de charger les données');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   // Helper function to format CFA currency
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '0 FCFA';
+    }
     return (
       new Intl.NumberFormat('fr-FR', {
         style: 'decimal',
@@ -72,134 +126,170 @@ export default function HomeScreen() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              Bonjour, {deliver?.name?.split(' ')[0] || 'Livreur'}
-            </Text>
-            <Text style={styles.subGreeting}>
-              Prêt pour une nouvelle journée ?
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.supportButton}>
-            <Phone
-              size={Theme.layout.iconSize.sm}
-              color={Theme.colors.neutral[500]}
-            />
-          </TouchableOpacity>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Animated.View
+            style={[
+              styles.heroContent,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View>
+              <Text style={styles.greeting}>
+                Bonjour, {deliver?.name?.split(' ')[0] || 'Livreur'}
+              </Text>
+              <Text style={styles.subGreeting}>
+                Prêt pour une nouvelle journée ?
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.supportButton}>
+              <Phone
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.neutral[500]}
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
         {/* Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <Text style={styles.statusTitle}>Statut Livreur</Text>
-            <View
-              style={[
-                styles.statusBadge,
-                isOnline ? styles.onlineBadge : styles.offlineBadge,
-              ]}
-            >
-              <Text
+        <Animated.View
+          style={[
+            styles.statusContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.statusCard}>
+            <View style={styles.statusHeader}>
+              <Text style={styles.statusTitle}>Statut Livreur</Text>
+              <View
                 style={[
-                  styles.statusBadgeText,
-                  isOnline ? styles.onlineText : styles.offlineText,
+                  styles.statusBadge,
+                  isOnline ? styles.onlineBadge : styles.offlineBadge,
                 ]}
               >
-                {isOnline ? 'En Ligne' : 'Hors Ligne'}
-              </Text>
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    isOnline ? styles.onlineText : styles.offlineText,
+                  ]}
+                >
+                  {isOnline ? 'En Ligne' : 'Hors Ligne'}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              isOnline ? styles.onlineButton : styles.offlineButton,
-            ]}
-            onPress={toggleOnlineStatus}
-          >
-            <Power size={Theme.layout.iconSize.md} color={Theme.colors.white} />
-            <Text style={styles.toggleButtonText}>
-              {isOnline ? 'Passer Hors Ligne' : 'Passer En Ligne'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                isOnline ? styles.onlineButton : styles.offlineButton,
+              ]}
+              onPress={toggleOnlineStatus}
+              activeOpacity={0.8}
+            >
+              <Power
+                size={Theme.layout.iconSize.md}
+                color={Theme.colors.white}
+                strokeWidth={2}
+              />
+              <Text style={styles.toggleButtonText}>
+                {isOnline ? 'Passer Hors Ligne' : 'Passer En Ligne'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
         {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Statistiques du jour</Text>
+          <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <DollarSign
-                  size={Theme.layout.iconSize.sm}
-                  color={Theme.colors.primary[500]}
-                />
-              </View>
-              <Text style={styles.statValue}>{formatCurrency(83000)}</Text>
-              <Text style={styles.statLabel}>Aujourd&apos;hui</Text>
+              <DollarSign
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {loading ? '...' : stats?.recent?.[0]?.amount ? formatCurrency(stats.recent[0].amount) : '0'}
+              </Text>
+              <Text style={styles.statLabel}>Gains</Text>
             </View>
 
             <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Package
-                  size={Theme.layout.iconSize.sm}
-                  color={Theme.colors.accent[500]}
-                />
-              </View>
-              <Text style={styles.statValue}>12</Text>
+              <Package
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.accent[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {loading ? '...' : stats?.recent?.[0]?.deliveries || '0'}
+              </Text>
               <Text style={styles.statLabel}>Livraisons</Text>
             </View>
-          </View>
 
-          <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Clock
-                  size={Theme.layout.iconSize.sm}
-                  color={Theme.colors.secondary[500]}
-                />
-              </View>
-              <Text style={styles.statValue}>6h 45m</Text>
+              <Clock
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.secondary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {loading ? '...' : stats?.recent?.[0]?.hours || '0h 0m'}
+              </Text>
               <Text style={styles.statLabel}>Temps actif</Text>
             </View>
 
             <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Star
-                  size={Theme.layout.iconSize.sm}
-                  color={Theme.colors.error[500]}
-                />
-              </View>
-              <Text style={styles.statValue}>{deliver?.rating || '4.8'}</Text>
-              <Text style={styles.statLabel}>Note moyenne</Text>
+              <Star
+                size={Theme.layout.iconSize.lg}
+                color={Theme.colors.error[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.statValue}>
+                {deliver?.rating || 'N/A'}
+              </Text>
+              <Text style={styles.statLabel}>Note</Text>
             </View>
           </View>
         </View>
 
         {/* Zone Info */}
-        <View style={styles.zoneCard}>
-          <View style={styles.zoneHeader}>
-            <MapPin
-              size={Theme.layout.iconSize.sm}
-              color={Theme.colors.neutral[500]}
-            />
-            <Text style={styles.zoneTitle}>Zone de Livraison</Text>
-          </View>
-          <Text style={styles.zoneLocation}>Plateau, Dakar</Text>
-          <Text style={styles.zoneDetails}>
-            8 commandes disponibles dans un rayon de 2 km
-          </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Zone de livraison</Text>
+          <View style={styles.zoneCard}>
+            <View style={styles.zoneHeader}>
+              <MapPin
+                size={Theme.layout.iconSize.md}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <View style={styles.zoneInfo}>
+                <Text style={styles.zoneLocation}>Zone de livraison</Text>
+                <Text style={styles.zoneDetails}>
+                  {loading ? 'Chargement...' : `${pendingMissionsCount} commande${pendingMissionsCount > 1 ? 's' : ''} disponible${pendingMissionsCount > 1 ? 's' : ''}`}
+                </Text>
+              </View>
+            </View>
 
-          <TouchableOpacity
-            style={styles.navigateButton}
-            onPress={() => router.push('/(deliver)/map')}
-          >
-            <Navigation
-              size={Theme.layout.iconSize.xs}
-              color={Theme.colors.primary[500]}
-            />
-            <Text style={styles.navigateText}>Voir la carte</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navigateButton}
+              onPress={() => router.push('/(deliver)/map')}
+              activeOpacity={0.7}
+            >
+              <Navigation
+                size={Theme.layout.iconSize.sm}
+                color={Theme.colors.primary[500]}
+                strokeWidth={2}
+              />
+              <Text style={styles.navigateText}>Voir la carte</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -214,31 +304,43 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
+
+  // Hero Section
+  heroSection: {
+    paddingTop: Theme.spacing.xl,
+    paddingBottom: Theme.spacing['5xl'],
+    paddingHorizontal: Theme.spacing['2xl'],
+    backgroundColor: Theme.colors.primary[50],
+  },
+  heroContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingVertical: Theme.spacing.lg,
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.neutral[200],
   },
   greeting: {
-    ...createTextStyle('2xl', 'bold', Theme.colors.neutral[900]),
+    ...createTextStyle('3xl', 'bold', Theme.colors.neutral[900]),
+    marginBottom: Theme.spacing.xs,
+    letterSpacing: -0.5,
   },
   subGreeting: {
-    ...createTextStyle('base', 'normal', Theme.colors.neutral[500]),
-    marginTop: 2,
+    ...createTextStyle('base', 'medium', Theme.colors.neutral[500]),
   },
   supportButton: {
-    padding: Theme.spacing.sm,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.md,
+    padding: Theme.spacing.md,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.full,
+  },
+
+  // Status Section
+  statusContainer: {
+    marginTop: -40,
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['3xl'],
   },
   statusCard: {
-    ...createCardStyle('md'),
-    margin: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
   statusHeader: {
     flexDirection: 'row',
@@ -261,17 +363,22 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.error[100],
   },
   statusBadgeText: {
-    ...createTextStyle('sm', 'medium'),
+    ...createTextStyle('sm', 'semibold'),
   },
   onlineText: {
-    color: Theme.colors.success[800],
+    color: Theme.colors.success[700],
   },
   offlineText: {
-    color: Theme.colors.error[800],
+    color: Theme.colors.error[700],
   },
   toggleButton: {
-    ...createButtonStyle('primary'),
-    gap: Theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing.xl,
+    borderRadius: Theme.borderRadius.lg,
+    gap: Theme.spacing.md,
   },
   onlineButton: {
     backgroundColor: Theme.colors.error[500],
@@ -282,142 +389,73 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     ...createTextStyle('base', 'semibold', Theme.colors.white),
   },
-  statsContainer: {
-    paddingHorizontal: Theme.spacing.lg,
-    marginBottom: Theme.spacing.lg,
+
+  // Section
+  section: {
+    paddingHorizontal: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['2xl'],
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Theme.spacing.md,
+  sectionTitle: {
+    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
     marginBottom: Theme.spacing.md,
   },
-  statCard: {
-    ...createCardStyle('sm'),
-    flex: 1,
-    alignItems: 'center',
+
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Theme.spacing.md,
   },
-  statIcon: {
-    width: Theme.layout.iconSize.xl,
-    height: Theme.layout.iconSize.xl,
-    backgroundColor: Theme.colors.neutral[100],
-    borderRadius: Theme.borderRadius.full,
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Theme.spacing.sm,
   },
   statValue: {
     ...createTextStyle('xl', 'bold', Theme.colors.neutral[900]),
+    marginTop: Theme.spacing.sm,
     marginBottom: Theme.spacing.xs,
   },
   statLabel: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
   },
+
+  // Zone Card
   zoneCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginBottom: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
   },
   zoneHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.md,
+    alignItems: 'flex-start',
+    gap: Theme.spacing.lg,
+    marginBottom: Theme.spacing.lg,
   },
-  zoneTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
+  zoneInfo: {
+    flex: 1,
   },
   zoneLocation: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
+    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
     marginBottom: Theme.spacing.xs,
   },
   zoneDetails: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
-    marginBottom: Theme.spacing.lg,
+    ...createTextStyle('sm', 'medium', Theme.colors.neutral[500]),
   },
   navigateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Theme.spacing.xs,
+    justifyContent: 'center',
+    paddingVertical: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.lg,
+    backgroundColor: Theme.colors.primary[50],
+    borderRadius: Theme.borderRadius.lg,
+    gap: Theme.spacing.sm,
   },
   navigateText: {
-    ...createTextStyle('base', 'medium', Theme.colors.primary[500]),
-  },
-  mapCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginBottom: Theme.spacing.lg,
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.xs,
-  },
-  mapTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-  },
-  mapSubtitle: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
-    marginBottom: Theme.spacing.lg,
-  },
-  mapContainer: {
-    borderRadius: Theme.borderRadius.md,
-    overflow: 'hidden',
-  },
-  performanceCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginBottom: Theme.spacing.lg,
-  },
-  performanceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.lg,
-  },
-  performanceTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-  },
-  performanceStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  performanceStat: {
-    alignItems: 'center',
-  },
-  performanceValue: {
-    ...createTextStyle('lg', 'bold', Theme.colors.primary[500]),
-    marginBottom: Theme.spacing.xs,
-  },
-  performanceLabel: {
-    ...createTextStyle('xs', 'normal', Theme.colors.neutral[500]),
-    textAlign: 'center',
-  },
-  goalCard: {
-    ...createCardStyle('md'),
-    marginHorizontal: Theme.spacing.lg,
-    marginBottom: Theme.spacing.xl,
-  },
-  goalTitle: {
-    ...createTextStyle('lg', 'semibold', Theme.colors.neutral[900]),
-    marginBottom: Theme.spacing.sm,
-  },
-  goalProgress: {
-    ...createTextStyle('base', 'medium', Theme.colors.neutral[700]),
-    marginBottom: Theme.spacing.md,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Theme.colors.neutral[200],
-    borderRadius: Theme.borderRadius.sm,
-    marginBottom: Theme.spacing.md,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Theme.colors.primary[500],
-    borderRadius: Theme.borderRadius.sm,
-  },
-  goalText: {
-    ...createTextStyle('sm', 'normal', Theme.colors.neutral[500]),
+    ...createTextStyle('base', 'semibold', Theme.colors.primary[500]),
   },
 });
