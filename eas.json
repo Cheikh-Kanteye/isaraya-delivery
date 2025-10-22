@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 16.17.3",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://isaraya.sarayatechsenegal.com/api"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://isaraya.sarayatechsenegal.com/api",
+        "EXPO_COMPILE_SDK_VERSION": "36",
+        "EXPO_MIN_SDK_VERSION": "24",
+        "EXPO_TARGET_SDK_VERSION": "36",
+        "EXPO_KOTLIN_VERSION": "2.1.20"
+      },
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -132,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const [isInitializing, setIsInitializing] = useState(true);
   const router = useRouter();
-  const tokenCheckIntervalRef = useRef<number | null>(null);
+  const tokenCheckIntervalRef = useRef<NodeJS.Timeout | number | null>(null);
 
   const authService = useRef(new AuthService()).current;
 
@@ -141,12 +141,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const checkTokenExpiration = async () => {
       try {
         const isExpired = await authService.isTokenExpired();
-        
+
         if (isExpired && state.isAuthenticated) {
           console.log('Token expiré détecté, déconnexion...');
           await authService.logout();
           dispatch({ type: 'AUTH_LOGOUT' });
-          
+
           Alert.alert(
             'Session expirée',
             'Votre session a expiré. Veuillez vous reconnecter.',
@@ -169,7 +169,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Vérifier toutes les 5 minutes
     if (state.isAuthenticated) {
       checkTokenExpiration(); // Vérification immédiate
-      tokenCheckIntervalRef.current = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+      tokenCheckIntervalRef.current = setInterval(
+        checkTokenExpiration,
+        5 * 60 * 1000
+      );
     }
 
     return () => {
@@ -184,7 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Valider la configuration au démarrage
         validateConfig();
-        
+
         await authService.initialize();
         const entity = await authService.getCurrentUser();
 
@@ -204,7 +207,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch (error) {
         console.error(`Auth initialization error:`, error);
         // Si c'est une erreur de configuration API, on peut continuer sans authentification
-        if (error instanceof Error && error.message.includes('Configuration API manquante')) {
+        if (
+          error instanceof Error &&
+          error.message.includes('Configuration API manquante')
+        ) {
           console.warn('API non configurée, mode hors ligne activé');
         }
         dispatch({ type: 'AUTH_INIT_COMPLETE' });
@@ -247,13 +253,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     try {
       dispatch({ type: 'AUTH_START' });
-      
+
       // Nettoyer l'intervalle de vérification du token
       if (tokenCheckIntervalRef.current) {
         clearInterval(tokenCheckIntervalRef.current);
         tokenCheckIntervalRef.current = null;
       }
-      
+
       await authService.logout();
       dispatch({ type: 'AUTH_LOGOUT' });
       router.replace('/onboarding');

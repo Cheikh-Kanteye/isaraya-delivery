@@ -1,5 +1,13 @@
 # Système de Paiement Mobile - Isaraya Delivery App
 
+## ⚠️ IMPORTANT
+
+**Le système d'écoute des deep links Expo dans `app/_layout.tsx` fonctionne correctement et NE DOIT PAS être modifié ou supprimé.**
+
+Le backend gère également la redirection via les URLs de webhook :
+- Success: `https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=success`
+- Cancel: `https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=cancelled`
+
 ## Vue d'ensemble
 
 L'application mobile Isaraya Delivery utilise un système de paiement avec redirection via deep linking pour gérer les paiements mobiles (Orange Money, Wave, Free Money).
@@ -67,8 +75,8 @@ PAYTECH_MOBILE_CANCEL_URL=https://your-api.com/api/orders/payment/webhook?redire
 
 #### Backend - Production (.env)
 ```env
-PAYTECH_MOBILE_SUCCESS_URL=https://your-api.com/api/orders/payment/webhook?redirect_to=isaraya://payment
-PAYTECH_MOBILE_CANCEL_URL=https://your-api.com/api/orders/payment/webhook?redirect_to=isaraya://payment
+PAYTECH_MOBILE_SUCCESS_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=success
+PAYTECH_MOBILE_CANCEL_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=cancelled
 ```
 
 ## Implémentation Frontend
@@ -196,8 +204,8 @@ PAYTECH_CANCEL_URL=https://your-web-app.com/payment/status/cancel
 **Production (standalone app) :**
 ```env
 # URLs de redirection mobiles
-PAYTECH_MOBILE_SUCCESS_URL=https://api.isaraya.com/api/orders/payment/webhook?redirect_to=isaraya://payment
-PAYTECH_MOBILE_CANCEL_URL=https://api.isaraya.com/api/orders/payment/webhook?redirect_to=isaraya://payment
+PAYTECH_MOBILE_SUCCESS_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=success
+PAYTECH_MOBILE_CANCEL_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=cancelled
 
 # URLs de redirection web
 PAYTECH_SUCCESS_URL=https://your-web-app.com/payment/status/success
@@ -341,8 +349,8 @@ isaraya://payment?status=error&ref=order-123&message=Erreur%20de%20traitement
 
 1. **Mettre à jour les URLs backend** :
    ```env
-   PAYTECH_MOBILE_SUCCESS_URL=https://api.isaraya.com/api/orders/payment/webhook?redirect_to=isaraya://payment
-   PAYTECH_MOBILE_CANCEL_URL=https://api.isaraya.com/api/orders/payment/webhook?redirect_to=isaraya://payment
+   PAYTECH_MOBILE_SUCCESS_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=success
+   PAYTECH_MOBILE_CANCEL_URL=https://isaraya.sarayatechsenegal.com/api/orders/payment/webhook?redirect_to=isaraya://payment?status=cancelled
    ```
 
 2. **Build l'application** :

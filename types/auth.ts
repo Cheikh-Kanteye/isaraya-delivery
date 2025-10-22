@@ -87,11 +87,25 @@ export interface ClientRegisterData extends BaseRegisterData {
 }
 
 export interface AuthContextType<T extends BaseUser> extends AuthState<T> {
-  login: (credentials: LoginCredentials, userType: 'CLIENT' | 'DELIVER') => Promise<void>;
-  register: (data: BaseRegisterData, userType: 'CLIENT' | 'DELIVER') => Promise<{ success: boolean; message: string; requiresVerification: boolean }>;
+  login: (
+    credentials: LoginCredentials,
+    userType: 'CLIENT' | 'DELIVER'
+  ) => Promise<void>;
+  register: (
+    data: BaseRegisterData,
+    userType: 'CLIENT' | 'DELIVER'
+  ) => Promise<{
+    success: boolean;
+    message: string;
+    requiresVerification: boolean;
+  }>;
   logout: () => Promise<void>;
-  verifyEmail: (data: VerifyEmailData) => Promise<{ success: boolean; message: string; email?: string }>;
-  requestPasswordReset: (data: RequestPasswordResetData) => Promise<{ message: string }>;
+  verifyEmail: (
+    data: VerifyEmailData
+  ) => Promise<{ success: boolean; message: string; email?: string }>;
+  requestPasswordReset: (
+    data: RequestPasswordResetData
+  ) => Promise<{ message: string }>;
   resetPassword: (data: ResetPasswordData) => Promise<{ message: string }>;
   updateProfile: (data: Partial<T>) => Promise<void>;
   clearError: () => void;

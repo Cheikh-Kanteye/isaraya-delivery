@@ -1,0 +1,28 @@
+subprojects { project ->
+    afterEvaluate {
+        android {
+            compileSdkVersion 36
+            defaultConfig {
+                minSdkVersion 24
+                targetSdkVersion 36
+            }
+        }
+    }
+}
+apply from: '../node_modules/expo-modules-autolinking/android/expo-autolinking.gradle'
+expoAutolinking()
+
+buildscript {
+    ext {
+        kotlinVersion = '2.1.20'
+        kspVersion = '2.1.20-2.0.1'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20'
+        classpath 'com.google.devtools.ksp:symbol-processing-gradle-plugin:2.1.20-2.0.1'
+    }
+}

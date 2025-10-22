@@ -3,7 +3,11 @@
     "name": "I-Saraya Delivery",
     "slug": "i-saraya-delivery",
     "extra": {
-      "googlePlacesApiKey": "api-key"
+      "googlePlacesApiKey": "api-key",
+      "router": {},
+      "eas": {
+        "projectId": "0a5e9ee9-afef-4afd-a333-1ec28b81250c"
+      }
     },
     "version": "1.0.0",
     "orientation": "portrait",

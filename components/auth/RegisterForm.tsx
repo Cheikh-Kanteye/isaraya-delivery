@@ -94,6 +94,7 @@ export default function RegisterForm({
       await register(formData, userType);
     } catch (error) {
       // Error is handled by the context
+      console.log(error);
     }
   };
 
